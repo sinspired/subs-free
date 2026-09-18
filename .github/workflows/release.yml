@@ -201,9 +201,9 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      # 同一台 runner、同一套已经装好的 NDK/Node/Java 环境里接着构建 Lite 变体，
+      # 同一台 runner、同一套已经装好的 NDK/Node/Java 环境里接着构建 lite 变体，
       # 避免再拉一份 matrix 只为了多编译一次前端 + Go 产物。
-      # LITE=true 会让 Taskfile 生成 bin/{{APP_NAME}}-Lite.apk（即 Subs-Free-Lite.apk），
+      # LITE=true 会让 Taskfile 生成 bin/{{APP_NAME}}-lite.apk（即 subs-free-lite.apk），
       # 与默认构建的 bin/{{APP_NAME}}.apk 互不覆盖。
       - name: Build & Package APK (release, lite)
         run: task android:package ARCH=${{ matrix.arch }} LITE=true
@@ -224,9 +224,9 @@ jobs:
             *)     ARCH_NAME="${GOARCH}" ;;
           esac
 
-          # 这一步现在应该同时拿到默认版和 Lite 版两个 apk（bin/Subs-Free.apk、
-          # bin/Subs-Free-Lite.apk），不能再用 `head -1` 只挑一个——那样会静默
-          # 丢掉另一个变体。按文件名里是否带 "-Lite" 后缀分别重命名。
+          # 这一步现在应该同时拿到默认版和 lite 版两个 apk（bin/subs-free.apk、
+          # bin/subs-free-lite.apk），不能再用 `head -1` 只挑一个——那样会静默
+          # 丢掉另一个变体。按文件名里是否带 "-lite" 后缀分别重命名。
           shopt -s nullglob
           apks=(bin/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then
@@ -237,7 +237,7 @@ jobs:
           # 重命名策略：subs-free_arm64.apk 和 subs-free_lite_arm64.apk
           for apk in "${apks[@]}"; do
             base=$(basename "${apk}")
-            if [[ "${base}" == *-Lite.apk ]]; then
+            if [[ "${base}" == *-lite.apk ]]; then
               dest="dist/${APP_NAME}_lite_${ARCH_NAME}.apk"
             else
               dest="dist/${APP_NAME}_${ARCH_NAME}.apk"

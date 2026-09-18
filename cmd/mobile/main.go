@@ -54,7 +54,7 @@ func main() {
 
 	// assetsDir 由 embed.go（frontend/dist）/ embed_lite.go（frontend/dist-lite）
 	// 按 -tags lite 决定，不能在这里写死 "frontend/dist"：
-	// Lite 版本的 embed.FS 里根本不存在 frontend/dist 这个子目录，
+	// lite 版本的 embed.FS 里根本不存在 frontend/dist 这个子目录，
 	// fs.Sub 会返回 error，导致应用一启动就 os.Exit(1) —— 这就是
 	// LITE=true 真机运行失败的根本原因。
 	frontendFS, err := fs.Sub(assets, assetsDir)

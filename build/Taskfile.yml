@@ -1,22 +1,20 @@
 # build\Taskfile.yml
 version: '3'
-
 tasks:
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
     # Universal/multi-arch builds invoke this concurrently from parallel deps;
+
     # two `go mod tidy` processes racing on go.mod can corrupt it (#4637).
     run: once
     cmds:
       - go mod tidy
-
   install:frontend:deps:
     summary: Install frontend dependencies
     run: once
     cmds:
       - task: install:frontend:deps:{{.PACKAGE_MANAGER}}
-
   install:frontend:deps:npm:
     dir: '{{.APP_DIR}}/frontend'
     sources:
@@ -29,7 +27,6 @@ tasks:
         msg: "Looks like npm isn't installed. Npm is part of the Node installer: https://nodejs.org/en/download/"
     cmds:
       - pnpm install
-
   install:frontend:deps:bun:
     dir: '{{.APP_DIR}}/frontend'
     sources:
@@ -43,7 +40,6 @@ tasks:
         msg: "bun not found"
     cmds:
       - bun install
-
   install:frontend:deps:pnpm:
     dir: '{{.APP_DIR}}/frontend'
     sources:
@@ -56,7 +52,6 @@ tasks:
         msg: "pnpm not found"
     cmds:
       - pnpm install
-
   install:frontend:deps:yarn:
     dir: '{{.APP_DIR}}/frontend'
     sources:
@@ -69,12 +64,12 @@ tasks:
         msg: "yarn not found"
     cmds:
       - yarn install
-
   build:frontend:
     # 增加 LITE 标签以便观察
     label: build:frontend (DEV={{.DEV}} LITE={{.LITE}} RUNNER={{.PACKAGE_MANAGER}})
     summary: Build the frontend project
     # darwin:build:universal runs its per-arch builds as parallel deps, each of
+
     # which depends on this task. Without run:once the two executions race:
     # one regenerates frontend/bindings (-clean deletes it first) while the
     # other's bundler is reading it, failing intermittently with
@@ -85,7 +80,7 @@ tasks:
       - "**/*"
       - exclude: node_modules/**/*
     generates:
-      # 让 Taskfile 知道 Lite 和标准版的产物目录不同，避免缓存冲突跳过构建
+      # 让 Taskfile 知道 lite 和标准版的产物目录不同，避免缓存冲突跳过构建
       - '{{if eq (print .LITE) "true"}}dist-lite{{else}}dist{{end}}/**/*'
     deps:
       - task: install:frontend:deps
@@ -103,7 +98,6 @@ tasks:
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
       LITE: '{{print .LITE}}'
-
   frontend:run:
     summary: Run a frontend script with selected runner
     cmds:
@@ -112,35 +106,30 @@ tasks:
           SCRIPT: "{{.SCRIPT}}"
     vars:
       SCRIPT: "{{.SCRIPT}}"
-
   frontend:run:npm:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - npm run {{.SCRIPT}} -q
     vars:
       SCRIPT: "{{.SCRIPT}}"
-
   frontend:run:yarn:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - yarn {{.SCRIPT}}
     vars:
       SCRIPT: "{{.SCRIPT}}"
-
   frontend:run:pnpm:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - pnpm run {{.SCRIPT}}
     vars:
       SCRIPT: "{{.SCRIPT}}"
-
   frontend:run:bun:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - bun run {{.SCRIPT}}
     vars:
       SCRIPT: "{{.SCRIPT}}"
-
   frontend:vendor:puppertino:
     summary: Fetches Puppertino CSS into frontend/public for consistent mobile styling
     dir: '{{.APP_DIR}}'
@@ -176,9 +165,6 @@ tasks:
           # Replace default .btn with Puppertino primary button classes if present
           sed -E -i'' 's/class=\"btn\"/class=\"p-btn p-prim-col\"/g' "$INDEX_HTML" || true
         fi
-
-
-
   generate:bindings:
     summary: Generates bindings for the frontend
     run: once
@@ -188,7 +174,7 @@ tasks:
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
-      - frontend/bindings/**/*  # Rerun when switching between dev/production mode causes changes in output
+      - frontend/bindings/**/* # Rerun when switching between dev/production mode causes changes in output
       - "**/*.go"
       - '{{.ROOT_DIR}}/go.mod'
       - '{{.ROOT_DIR}}/go.sum'
@@ -196,7 +182,6 @@ tasks:
       - frontend/bindings/**/*
     cmds:
       - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
-
   generate:icons:
     summary: Generates Windows `.ico` and Mac `.icns` from an image; on macOS, `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file (skipped on other platforms).
     run: once
@@ -209,40 +194,33 @@ tasks:
       - "windows/icon.ico"
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
-
   dev:frontend:
     summary: Runs the frontend in development mode
     deps:
       - task: install:frontend:deps
     cmds:
       - task: frontend:dev:{{.PACKAGE_MANAGER}}
-
   frontend:dev:npm:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - npm run dev -- --port {{.VITE_PORT}} --strictPort
-
   frontend:dev:yarn:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - yarn dev --port {{.VITE_PORT}} --strictPort
-
   frontend:dev:pnpm:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - pnpm dev --port {{.VITE_PORT}} --strictPort
-
   frontend:dev:bun:
     dir: '{{.APP_DIR}}/frontend'
     cmds:
       - bun run dev --port {{.VITE_PORT}} --strictPort
-
   update:build-assets:
     summary: Updates the build assets
     dir: '{{.ROOT_DIR}}/build'
     cmds:
       - wails3 update build-assets -name "{{.APP_NAME}}" -binaryname "{{.APP_NAME}}" -config config.yml -dir .
-
   build:server:
     summary: Builds the application in server mode (no GUI, HTTP server only)
     desc: |
@@ -270,7 +248,6 @@ tasks:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}" ./cmd/desktop'
     vars:
       BUILD_FLAGS: '-tags server{{if eq .DEV "true"}}{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -buildvcs=false -gcflags=all="-l"{{else}},production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
-
   run:server:
     summary: Builds and runs a development server (DEV=true)
     deps:
@@ -279,7 +256,6 @@ tasks:
           DEV: "true"
     cmds:
       - '"./{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}"'
-
   build:docker:
     summary: Builds a Docker image for server mode deployment
     desc: |
@@ -300,12 +276,7 @@ tasks:
           BUILD_FLAGS: "-tags server,production"
     cmds:
       - >-
-        docker build
-        --build-arg CGO_ENABLED={{.CGO_ENABLED | default "1"}}
-        --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:alpine"}}
-        --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}}
-        -t {{.TAG | default (printf "%s:latest" .APP_NAME)}}
-        -f build/docker/Dockerfile.server .
+        docker build --build-arg CGO_ENABLED={{.CGO_ENABLED | default "1"}} --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:alpine"}} --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}} -t {{.TAG | default (printf "%s:latest" .APP_NAME)}} -f build/docker/Dockerfile.server .
     vars:
       TAG: "{{.TAG}}"
     preconditions:
@@ -313,7 +284,6 @@ tasks:
         msg: "Docker is required. Please install Docker first."
       - sh: test -f build/docker/Dockerfile.server
         msg: "Dockerfile.server not found. Run 'wails3 update build-assets' to generate it."
-
   run:docker:
     summary: Builds and runs the Docker image
     desc: |
@@ -332,7 +302,6 @@ tasks:
     vars:
       TAG: "{{.TAG}}"
       PORT: "{{.PORT}}"
-
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
     desc: |
@@ -343,22 +312,20 @@ tasks:
     preconditions:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker is required. Please install Docker first."
-
   ios:device:list:
     summary: Lists connected iOS devices (UDIDs)
     cmds:
       - xcrun xcdevice list
-
   ios:run:device:
     summary: Build, install, and launch on a physical iPhone using Apple tools (xcodebuild/devicectl)
     vars:
-      PROJECT: '{{.PROJECT}}'   # e.g., build/ios/xcode/<YourProject>.xcodeproj
-      SCHEME: '{{.SCHEME}}'     # e.g., ios.dev
+      PROJECT: '{{.PROJECT}}' # e.g., build/ios/xcode/<YourProject>.xcodeproj
+      SCHEME: '{{.SCHEME}}' # e.g., ios.dev
       CONFIG: '{{.CONFIG | default "Debug"}}'
       DERIVED: '{{.DERIVED | default "build/ios/DerivedData"}}'
-      UDID: '{{.UDID}}'         # from `task ios:device:list`
+      UDID: '{{.UDID}}' # from `task ios:device:list`
       BUNDLE_ID: '{{.BUNDLE_ID}}' # e.g., com.yourco.wails.ios.dev
-      TEAM_ID: '{{.TEAM_ID}}'   # optional, if your project is not already set up for signing
+      TEAM_ID: '{{.TEAM_ID}}' # optional, if your project is not already set up for signing
     preconditions:
       - sh: xcrun -f xcodebuild
         msg: "xcodebuild not found. Please install Xcode."

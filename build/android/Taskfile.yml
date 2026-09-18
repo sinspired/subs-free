@@ -1,23 +1,24 @@
 # build\android\Taskfile.yml
 version: '3'
-
 includes:
   common:
     taskfile: ../Taskfile.yml
     vars:
       APP_DIR: '../../cmd/mobile'
-
 vars:
   APP_ID: '{{.APP_ID | default "com.sinspired.subs_free"}}'
   MIN_SDK: '21'
   TARGET_SDK: '35'
   # The emulator runs the host architecture; physical devices are arm64
+
   HOST_ARCH:
     sh: '{{if eq .OS "windows"}}echo amd64{{else}}[ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64"{{end}}'
   # System-image ABI for the host, used in the "create an AVD" hint below.
+
   ANDROID_ABI:
     sh: '{{if eq .OS "windows"}}echo x86_64{{else}}[ "$(uname -m)" = "arm64" ] && echo "arm64-v8a" || echo "x86_64"{{end}}'
   # SDK location: $ANDROID_HOME / $ANDROID_SDK_ROOT, else the per-OS default
+
   # (macOS: ~/Library/Android/sdk, Linux/other: ~/Android/Sdk)
   SDK_ROOT:
     sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"'
@@ -26,6 +27,7 @@ vars:
   EMULATOR:
     sh: 'command -v emulator || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}/emulator/emulator"'
   # avdmanager lives under cmdline-tools/<version>/bin; used to auto-create an
+
   # AVD when none exists (mirrors the iOS `ensure-simulator` auto-create flow).
   AVDMANAGER:
     sh: 'command -v avdmanager || ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"/cmdline-tools/*/bin/avdmanager 2>/dev/null | sort -V | tail -1 || true'
@@ -35,7 +37,6 @@ vars:
     sh: 'go run ./build/tools/verinfo core-version'
   DEFAULT_CORE_COMMIT:
     sh: 'go run ./build/tools/verinfo core-commit'
-
 tasks:
   install:deps:
     summary: Check and install Android development dependencies
@@ -44,7 +45,6 @@ tasks:
     env:
       TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
     prompt: This will check and install Android development dependencies. Continue?
-
   build:
     summary: Creates a debug build of the application for Android
     deps:
@@ -58,7 +58,7 @@ tasks:
             ref: .PRODUCTION
           LITE: '{{.LITE}}'
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
       CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
       CORE_COMMIT: '{{.CORE_COMMIT | default .DEFAULT_CORE_COMMIT}}'
       GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
@@ -78,7 +78,6 @@ tasks:
           LITE: '{{.LITE}}'
     env:
       PRODUCTION: '{{.PRODUCTION | default "false"}}'
-
   compile:go:shared:
     summary: Compile Go code to shared library (.so)
     vars:
@@ -138,7 +137,6 @@ tasks:
 
         go build -buildmode=c-shared -overlay build/android/overlay.json {{.BUILD_FLAGS}} \
           -o build/android/app/src/main/jniLibs/$JNI_DIR/libwails.so ./cmd/mobile
-
   compile:go:all-archs:
     summary: Compile Go code for all Android architectures (fat APK)
     cmds:
@@ -148,7 +146,6 @@ tasks:
       - task: compile:go:shared
         vars:
           ARCH: amd64
-
   package:
     summary: Packages a production build of the application into a signed release APK
     desc: |
@@ -167,7 +164,6 @@ tasks:
       - task: assemble:apk:release
         vars:
           LITE: '{{.LITE}}'
-
   package:fat:
     summary: Packages a production build for all architectures (fat APK)
     deps:
@@ -191,7 +187,6 @@ tasks:
       - task: assemble:apk:release
         vars:
           LITE: '{{.LITE}}'
-
   bundle:
     summary: Packages a production AAB (Android App Bundle) for Play Store submission
     desc: |
@@ -210,7 +205,6 @@ tasks:
       - task: assemble:aab:release
         vars:
           LITE: '{{.LITE}}'
-
   bundle:fat:
     summary: Packages a production AAB for all architectures
     deps:
@@ -234,11 +228,10 @@ tasks:
       - task: assemble:aab:release
         vars:
           LITE: '{{.LITE}}'
-
   assemble:apk:
     summary: Assembles a debug APK using Gradle
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
         msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
@@ -258,11 +251,10 @@ tasks:
           ./gradlew assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk "../../{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
           echo "APK created: {{.BIN_DIR}}/{{.OUT_NAME}}.apk"
-
   assemble:apk:release:
     summary: Assembles a release APK using Gradle (signed with the debug keystore unless ANDROID_KEYSTORE_FILE is set)
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
         msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
@@ -282,11 +274,10 @@ tasks:
           ./gradlew assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "../../{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
           echo "Release APK created: {{.BIN_DIR}}/{{.OUT_NAME}}.apk"
-
   assemble:aab:
     summary: Assembles a debug AAB (Android App Bundle) using Gradle
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
         msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
@@ -306,11 +297,10 @@ tasks:
           ./gradlew bundleDebug
           cp app/build/outputs/bundle/debug/app-debug.aab "../../{{.BIN_DIR}}/{{.OUT_NAME}}.aab"
           echo "AAB created: {{.BIN_DIR}}/{{.OUT_NAME}}.aab"
-
   assemble:aab:release:
     summary: Assembles a release AAB for Play Store upload (signed with the debug keystore unless ANDROID_KEYSTORE_FILE is set)
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
         msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
@@ -339,11 +329,11 @@ tasks:
           ./gradlew bundleRelease
           cp app/build/outputs/bundle/release/app-release.aab "../../{{.BIN_DIR}}/{{.OUT_NAME}}.aab"
           echo "Release AAB created: {{.BIN_DIR}}/{{.OUT_NAME}}.aab"
-
   generate:android:overlay:
     internal: true
     summary: Generate Go build overlay that registers the Android main
     # 改变当前任务的工作目录到真实的 Go 入口，欺骗 wails3 使其生成包含 cmd/mobile 路径的 key
+
     dir: '{{.ROOT_DIR}}/cmd/mobile'
     sources:
       # 因为切换了工作目录，原有的相对路径需要修改为基于 ROOT_DIR 的绝对路径
@@ -353,7 +343,6 @@ tasks:
       - '{{.ROOT_DIR}}/build/android/gen/main_android.gen.go'
     cmds:
       - wails3 android overlay:gen -out '{{.ROOT_DIR}}/build/android/overlay.json' -config '{{.ROOT_DIR}}/build/config.yml'
-
   generate:android:bindings:
     internal: true
     summary: Generates bindings for Android
@@ -370,7 +359,6 @@ tasks:
     env:
       GOOS: android
       CGO_ENABLED: 0
-
   ensure-emulator:
     internal: true
     summary: Ensure Android Emulator is running
@@ -437,7 +425,6 @@ tasks:
         msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
       - sh: '[ -x "{{.EMULATOR}}" ] || command -v emulator'
         msg: "emulator not found. Install the Android SDK emulator package (or set ANDROID_HOME)"
-
   deploy-emulator:
     summary: Deploy the packaged release APK to the Android Emulator
     deps:
@@ -446,13 +433,12 @@ tasks:
           ARCH: '{{.ARCH | default .HOST_ARCH}}'
           LITE: '{{.LITE}}'
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     cmds:
       - task: ensure-emulator
       - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
       - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"'
       - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
-
   run:
     summary: Build, install and launch a debug build in the Android Emulator
     deps:
@@ -461,7 +447,7 @@ tasks:
         vars:
           LITE: '{{.LITE}}'
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     cmds:
       - task: assemble:apk
         vars:
@@ -469,12 +455,10 @@ tasks:
       - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
       - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"'
       - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
-
   device:list:
     summary: Lists connected Android devices and emulators (serials)
     cmds:
       - '"{{.ADB}}" devices -l'
-
   run:device:
     summary: Build, install and launch a debug build on a connected physical Android device
     deps:
@@ -483,7 +467,7 @@ tasks:
           ARCH: arm64
           LITE: '{{.LITE}}'
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     cmds:
       - task: assemble:apk
         vars:
@@ -506,7 +490,6 @@ tasks:
     preconditions:
       - sh: '[ -x "{{.ADB}}" ] || command -v adb'
         msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
-
   deploy-device:
     summary: Deploy the packaged release APK to a connected physical Android device
     deps:
@@ -515,7 +498,7 @@ tasks:
           ARCH: arm64
           LITE: '{{.LITE}}'
     vars:
-      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-Lite{{else}}{{.APP_NAME}}{{end}}'
+      OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
     cmds:
       - |
         DEVICE='{{.DEVICE_ID | default ""}}'
@@ -527,11 +510,9 @@ tasks:
         "{{.ADB}}" -s "$DEVICE" uninstall {{.APP_ID}} 2>/dev/null || true
         "{{.ADB}}" -s "$DEVICE" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
         "{{.ADB}}" -s "$DEVICE" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity
-
     preconditions:
       - sh: '[ -x "{{.ADB}}" ] || command -v adb'
         msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
-
   studio:
     summary: Open the generated Android project in Android Studio
     cmds:
@@ -543,17 +524,14 @@ tasks:
           echo "then open the build/android directory."
           exit 1
         fi
-
   logs:
     summary: Stream Android logcat filtered to this app
     cmds:
       - '"{{.ADB}}" logcat -v time | grep -E "(Wails|{{.APP_NAME}})" || true'
-
   logs:all:
     summary: Stream all Android logcat (verbose)
     cmds:
       - '"{{.ADB}}" logcat -v time'
-
   clean:
     summary: Clean build artifacts
     cmds:

@@ -1,9 +1,9 @@
 import { defineConfig } from "vite";
 import wails from "@wailsio/runtime/plugins/vite";
 
-// 动态判断当前是否为 Lite 构建
-const isLite = process.env.LITE === "true";
-const outDir = isLite ? "dist-lite" : "dist";
+// 动态判断当前是否为 lite 构建
+const islite = process.env.LITE === "true";
+const outDir = islite ? "dist-lite" : "dist";
 
 // 独立于 vite.config.ts 的第二个构建入口：只打包 wails-bridge.ts，
 // 输出成一个不依赖 ES module 的 IIFE（frontend/dist/wails-bridge.js），
