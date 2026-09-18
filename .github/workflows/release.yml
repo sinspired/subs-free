@@ -160,13 +160,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # ubuntu-latest runner 自带 Android SDK cmdline-tools/platform-tools，
-      # 但 NDK 版本不一定装了，这里显式装一个锁定版本，保证可复现构建。
-      - name: Install Android NDK
-        run: |
-          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.0.12077973" --sdk_root=${ANDROID_HOME}
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.0.12077973" >> "$GITHUB_ENV"
-
       - name: Install Task CLI and pnpm
         run: npm install -g @go-task/cli pnpm
 

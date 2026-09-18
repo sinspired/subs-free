@@ -17,17 +17,19 @@ homepage: "https://github.com/sinspired/subs-free"
 license: "MIT"
 release: "1"
 contents:
-  - src: "./bin/Subs-Free"
+  - src: "./bin/subs-free"
     dst: "/usr/local/bin/subs-free"
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/subs-free.png"
   - src: "./build/linux/subs-free.desktop"
     dst: "/usr/share/applications/subs-free.desktop"
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
+
 depends:
   - libgtk-4-1
   - libwebkitgtk-6.0-4
 # Distribution-specific overrides for different package formats
+
 overrides:
   # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
   rpm:
@@ -35,17 +37,19 @@ overrides:
       - gtk4
       - webkitgtk6.0
   # Arch Linux packages
+
   archlinux:
     depends:
       - gtk4
       - webkitgtk-6.0
 # scripts section to ensure desktop database is updated after install
+
 scripts:
   postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
   # You can also add preremove, postremove if needed
+
 # preremove: "./build/linux/nfpm/scripts/preremove.sh"
 # postremove: "./build/linux/nfpm/scripts/postremove.sh"
-
 # If you build your app with -tags gtk3 (legacy WebKit2GTK 4.1 stack — supported through v3.0.x, removed in v3.1),
 # replace the depends/overrides above with these:
 #
