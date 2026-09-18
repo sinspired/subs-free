@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=subs-free
+Comment=A subs-free application, based on subs-check-pro v3 core
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/subs-free %u
+Terminal=false
+Type=Application
+Icon=subs-free
+Categories=Utility;
+StartupWMClass=subs-free
+
+ 

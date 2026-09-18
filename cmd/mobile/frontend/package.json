@@ -1,0 +1,30 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:lite": "cross-env LITE=true vite",
+    "preview": "vite preview",
+
+    "build": "vite build --mode production && vite build --config vite.bridge.config.ts --mode production",
+    "build:lite": "cross-env LITE=true vite build --mode production && cross-env LITE=true vite build --config vite.bridge.config.ts --mode production",
+
+    "build:dev": "vite build --minify false --mode development && vite build --config vite.bridge.config.ts --minify false --mode development",
+    "build:dev:lite": "cross-env LITE=true vite build --minify false --mode development && cross-env LITE=true vite build --config vite.bridge.config.ts --minify false --mode development",
+
+    "build:bridge": "vite build --config vite.bridge.config.ts"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "latest",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^22.20.3",
+    "cross-env": "^10.1.0",
+    "typescript": "^4.9.3",
+    "vite": "^8.0.5"
+  }
+}

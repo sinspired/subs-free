@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CFBundleExecutable</key>
+		<string>subs-free</string>
+		<key>CFBundleGetInfoString</key>
+		<string>A modern GUI of Subs-Check-Pro, for high-performance proxy management, check, and
+			subscription management and generation</string>
+		<key>CFBundleIconFile</key>
+		<string>icons</string>
+		<key>CFBundleIconName</key>
+		<string>appicon</string>
+		<key>CFBundleIdentifier</key>
+		<string>com.sinspired.subs-check-pro-gui</string>
+		<key>CFBundleName</key>
+		<string>subs-check-pro-gui</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>0.0.1</string>
+		<key>CFBundleVersion</key>
+		<string>0.0.1</string>
+		<key>LSMinimumSystemVersion</key>
+		<string>12.0.0</string>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsLocalNetworking</key>
+			<true />
+			<key>NSAllowsArbitraryLoads</key>
+			<true />
+		</dict>
+		<key>NSHighResolutionCapable</key>
+		<string>true</string>
+		<key>NSHumanReadableCopyright</key>
+		<string>(c) 2026, sinspired</string>
+	</dict>
+</plist>

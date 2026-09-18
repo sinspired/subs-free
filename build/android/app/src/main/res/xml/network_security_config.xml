@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 仅放行本机回环地址的明文 HTTP。Sub-Store 内嵌服务器（SubStorePort）和
+         管理面板在移动端都是通过真实的 127.0.0.1:<port> socket 访问的，Android 9+
+         默认阻断所有明文流量（ERR_CLEARTEXT_NOT_PERMITTED）。这里只放行 127.0.0.1
+         / localhost，流量从不离开设备，不构成安全隐患；不做全局明文放行。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+
+    <!-- 其余所有域名维持默认策略（仅 HTTPS），不受影响 -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

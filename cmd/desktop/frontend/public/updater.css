@@ -1,0 +1,352 @@
+/* frontend/public/updater.css
+   「检查更新」窗口专属样式
+   依赖 style.css 中的设计变量：--bg --card --fg --muted --border --accent --success
+
+   布局（从上到下）：
+     titlebar  32px      拖拽区
+     hero      ~120px    图标 · 标题 · ver-pill · 副标题
+     progress  20px      始终占位；opacity 淡入/出，不引起布局跳变
+     notes     flex:1    Release Notes，内容在下载流程中持续保留
+     actions   ~80px     主按钮 + ghost 按钮行
+   ──────────────────────────────────────────────────────────────── */
+
+/* 局部补充变量 */
+.upd-root {
+  --error: #ef4444;
+  --upd-r: 10px;
+
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  padding: 0 26px 18px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+
+/* ── 标题栏拖拽区 ── */
+.upd-titlebar {
+  height: 32px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  --wails-draggable: drag;
+}
+
+/* ══════════════════════════════════════════
+   Hero
+   ══════════════════════════════════════════ */
+.upd-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0 12px;
+  flex-shrink: 0;
+}
+
+/* 图标容器 */
+.upd-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s, color 0.3s;
+  flex-shrink: 0;
+}
+.upd-icon-wrap.is-success {
+  background: color-mix(in srgb, var(--success) 11%, transparent);
+  color: var(--success);
+}
+.upd-icon-wrap.is-error {
+  background: color-mix(in srgb, var(--error) 11%, transparent);
+  color: var(--error);
+}
+
+/* 旋转动画（checking / downloading / verifying / installing） */
+@keyframes upd-icon-rotate {
+  to { transform: rotate(360deg); }
+}
+.upd-spin {
+  animation: upd-icon-rotate 1s linear infinite;
+  transform-origin: center;
+}
+
+/* 标题 */
+.upd-hero-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+}
+
+/* 版本药丸 */
+.upd-ver-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 11px 3px 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.upd-ver-pill .cur { font-weight: 500; }
+.upd-ver-pill .arr { opacity: 0.5; }
+.upd-ver-pill .nxt { color: var(--accent); font-weight: 600; }
+
+/* 副标题 */
+.upd-hero-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 1.4em;
+  text-align: center;
+  word-break: break-all;
+}
+
+/* ══════════════════════════════════════════
+   Progress container
+   始终占据布局高度（约 20px），opacity 渐变，
+   不触发 layout reflow，notes 高度保持稳定。
+   ══════════════════════════════════════════ */
+.upd-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 2px 0 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.upd-progress-container.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.upd-progress-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.upd-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.35s ease;
+}
+
+@keyframes upd-shimmer {
+  0%   { transform: translateX(-200%); }
+  100% { transform: translateX(600%); }
+}
+.upd-progress-fill.indeterminate {
+  width: 28%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: upd-shimmer 1.4s ease-in-out infinite;
+}
+
+.upd-progress-label {
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════
+   Release Notes（flex:1，始终在 DOM）
+   ══════════════════════════════════════════ */
+.upd-notes {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--upd-r);
+  padding: 10px 13px;
+  margin: 2px 0 10px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.upd-notes::-webkit-scrollbar { width: 4px; }
+.upd-notes::-webkit-scrollbar-track { background: transparent; }
+.upd-notes::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+.upd-notes::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+.upd-notes-placeholder {
+  margin: 0;
+  text-align: center;
+  padding: 20px 0;
+  opacity: 0.5;
+  font-size: 12px;
+  user-select: none;
+}
+
+/* Markdown 渲染 */
+.upd-notes-body h1,
+.upd-notes-body h2,
+.upd-notes-body h3,
+.upd-notes-body h4,
+.upd-notes-body h5,
+.upd-notes-body h6 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 10px 0 4px;
+  line-height: 1.4;
+}
+.upd-notes-body :is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+
+.upd-notes-body p   { margin: 3px 0; }
+.upd-notes-body hr  { margin: 9px 0; border: none; border-top: 1px solid var(--border); }
+.upd-notes-body ul,
+.upd-notes-body ol  { padding-left: 16px; margin: 3px 0; }
+.upd-notes-body li  { margin: 2px 0; }
+
+.upd-notes-body code {
+  font-family: "Fira Code", "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--fg);
+}
+.upd-notes-body pre {
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  padding: 7px 9px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.upd-notes-body pre code { background: none; padding: 0; }
+
+.upd-notes-body strong { color: var(--fg); font-weight: 600; }
+.upd-notes-body em     { font-style: italic; }
+.upd-notes-body del    { opacity: 0.6; }
+
+.upd-notes-body blockquote {
+  margin: 5px 0;
+  padding: 2px 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.upd-notes-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.upd-notes-body a:hover { text-decoration: underline; opacity: 0.85; }
+
+.upd-notes-body img {
+  max-height: 18px;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+.upd-notes-body table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+  margin: 5px 0;
+}
+.upd-notes-body th,
+.upd-notes-body td {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.upd-notes-body th { color: var(--fg); font-weight: 600; }
+
+/* ══════════════════════════════════════════
+   Actions
+   ══════════════════════════════════════════ */
+.upd-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+/* 主按钮 */
+.upd-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 0;
+  border: none;
+  border-radius: var(--upd-r);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.1s;
+  user-select: none;
+}
+.upd-btn-primary:hover:not(:disabled)  { opacity: 0.87; }
+.upd-btn-primary:active:not(:disabled) { transform: scale(0.985); }
+.upd-btn-primary:disabled              { opacity: 0.45; cursor: not-allowed; }
+
+/* 次级按钮行 */
+.upd-btn-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.upd-btn-ghost {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 6px;
+  transition: background 0.16s, color 0.16s;
+  user-select: none;
+}
+.upd-btn-ghost:hover {
+  background: color-mix(in srgb, var(--border) 65%, transparent);
+  color: var(--fg);
+}
+
+/* 主按钮内嵌 spinner */
+@keyframes upd-btn-rotate {
+  to { transform: rotate(360deg); }
+}
+.upd-btn-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, #fff 28%, transparent);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: upd-btn-rotate 0.65s linear infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}

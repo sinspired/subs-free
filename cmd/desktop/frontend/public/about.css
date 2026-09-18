@@ -1,0 +1,1339 @@
+/* frontend/public/about.css
+   「关于」窗口专属样式 — 侘寂风分栏布局（800×600 优化版）
+   依赖 style.css 中定义的 CSS 变量与 .icon-btn 等基础类
+   ─────────────────────────────────────────────────────────── */
+
+/* ── 全局动画 ── */
+@keyframes aw-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aw-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   根容器：横向分栏，撑满窗口
+   ══════════════════════════════════════════════════════ */
+.aw-root {
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  background: var(--card);
+  color: var(--fg);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   左侧边栏（固定 200px）
+   侘寂美学：纯净底色，Logo 自然呈现，无光晕堆叠
+   ══════════════════════════════════════════════════════ */
+.aw-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--card);
+  position: relative;
+  overflow: hidden;
+  -webkit-app-region: drag;
+  /* 整个侧边栏可拖动 */
+  --wails-draggable: drag;
+}
+
+/* 右侧细分隔线（渐变淡入淡出，避免截断感） */
+.aw-sidebar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 48px;
+  bottom: 48px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--border) 20%,
+    var(--border) 80%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* Mac 原生标题栏高度占位（InvisibleTitleBarHeight = 30px，留 38px 保险） */
+.aw-sidebar-titlebar {
+  width: 100%;
+  height: 38px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+/* ── 品牌区：Logo + 应用名 ── */
+.aw-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px 20px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  pointer-events: none;
+  /* 品牌区不拦截拖动 */
+}
+
+.aw-logo {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 14px;
+  display: block;
+  /* 仅极微弱的阴影，保留图标本身的层次 */
+  filter: drop-shadow(0 3px 10px color-mix(in srgb, var(--fg) 4%, transparent));
+}
+
+.aw-app-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: -0.2px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.aw-app-name .pro {
+  color: var(--accent);
+  font-size: 9px;
+  vertical-align: super;
+  font-weight: 700;
+  margin-left: 1px;
+}
+
+.aw-app-sub {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.55;
+  margin-top: 6px;
+  text-align: center;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+}
+
+/* ── 版本信息块 ── */
+.aw-ver-block {
+  width: calc(100% - 28px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.aw-ver-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: opacity 0.15s;
+}
+
+.aw-ver-row:hover {
+  opacity: 0.7;
+}
+
+/* 状态指示点 */
+.aw-ver-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aw-ver-dot.gui-dot {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.aw-ver-dot.core-dot {
+  background: var(--muted);
+  opacity: 0.45;
+}
+
+.aw-ver-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  width: 30px;
+  flex-shrink: 0;
+}
+
+.aw-ver-val {
+  flex: 1;
+  font-size: 10px;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.aw-ver-val.accent {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* 版本行间分割线 */
+.aw-ver-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
+  opacity: 0.6;
+}
+
+/* ── 垂直导航菜单 ── */
+.aw-nav {
+  width: calc(100% - 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.aw-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 14px 9px 18px;
+  /* 左侧留出指示器空间 */
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+  transition:
+    color 0.2s,
+    background 0.2s;
+  outline: none;
+  text-align: left;
+  gap: 8px;
+}
+
+.aw-nav-item:hover {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.aw-nav-item.active {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* 激活指示条（左侧 2px 竖线） */
+.aw-nav-item::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 2px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.aw-nav-item.active::before {
+  transform: translateY(-50%) scaleY(1);
+}
+
+.aw-nav-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: 1;
+  transition: font-weight 0.1s;
+}
+
+.aw-nav-item.active .aw-nav-label {
+  font-weight: 600;
+}
+
+.aw-nav-hint {
+  font-size: 9px;
+  opacity: 0;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  font-family: "Fira Code", "Cascadia Code", monospace;
+  transition: opacity 0.2s;
+}
+
+.aw-nav-item:hover .aw-nav-hint,
+.aw-nav-item.active .aw-nav-hint {
+  opacity: 0.45;
+}
+
+/* ── 侧边栏底部版权 ── */
+.aw-sidebar-footer {
+  margin-top: auto;
+  padding: 0 16px 20px;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.25;
+  text-align: center;
+  -webkit-app-region: drag;
+}
+
+/* ══════════════════════════════════════════════════════
+   右侧内容区（flex:1，背景稍与侧边栏区分）
+   ══════════════════════════════════════════════════════ */
+.aw-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  /* 细微的底色差，制造层次感 */
+  overflow: hidden;
+  transition: background 0.2s;
+}
+
+/* 工具栏：拖拽区 + 主题切换按钮 */
+.aw-content-toolbar {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.aw-drag-area {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+/* ── 面板容器 ── */
+.aw-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 每个面板：绝对定位以支持动画，内部滚动 */
+.aw-panel {
+  position: absolute;
+  inset: 0;
+  padding: 12px 36px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  animation: aw-fade-up 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-app-region: no-drag;
+}
+
+.aw-panel::-webkit-scrollbar {
+  width: 3px;
+}
+
+.aw-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.aw-panel::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.aw-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* ─────────────────────────────────────────
+   面板 1：系统概览
+   ───────────────────────────────────────── */
+.aw-intro-lead {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+.aw-intro-lead strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.aw-arch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+}
+
+.aw-arch-col h3 {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 彩色标记点 */
+.aw-arch-col h3 .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aw-arch-col h3 .dot.gui {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.aw-arch-col h3 .dot.core {
+  background: var(--muted);
+  opacity: 0.55;
+}
+
+.aw-arch-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.aw-arch-col ul li {
+  position: relative;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 2.1;
+  padding-left: 14px;
+}
+
+/* 极简项目符号：小圆点 */
+.aw-arch-col ul li::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+/* ─────────────────────────────────────────
+   面板 2：核心特性
+   ───────────────────────────────────────── */
+.aw-features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 28px;
+  align-content: start;
+}
+
+.aw-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px;
+  border-radius: 7px;
+  cursor: default;
+  transition:
+    color 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+
+.aw-feature-item:hover {
+  transform: translateX(3px);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+.aw-feature-item:hover .aw-feature-label {
+  color: var(--fg);
+}
+
+.aw-feature-emoji {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+  opacity: 0.3;
+  filter: grayscale(100%);
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
+}
+
+.aw-feature-item:hover .aw-feature-emoji {
+  opacity: 0.9;
+  filter: grayscale(0%);
+}
+
+.aw-feature-label {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  transition: color 0.18s;
+}
+
+/* ─────────────────────────────────────────
+   面板 3：生态资源
+   Telegram 主推卡（突出）+ 三项次要卡并排
+   ───────────────────────────────────────── */
+
+/* 整体纵向布局，撑满面板高度 */
+.aw-res-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+/* 主要两项：等宽并排，固定高度 */
+.aw-res-primary {
+  display: grid;
+  flex: 0 0 auto;
+  /* 上部固定高度，不参与伸缩 */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 次要三项：等宽并排，占据剩余高度 */
+.aw-res-secondary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-top: 10px;
+}
+
+/* ── 通用卡片基础 ── */
+.aw-link-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.aw-link-card:active {
+  transform: scale(0.98);
+}
+
+/* 左侧 accent 入场条（弹性伸缩） */
+.aw-link-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition:
+    opacity 0.2s,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.aw-link-card:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* ── 主推卡：水平布局 + accent 底色 ── */
+.aw-link-card.aw-featured {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  border: none;
+  background: transparent;
+  padding: 12px;
+}
+
+.aw-link-card.aw-featured:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.aw-link-card.aw-featured .aw-link-title {
+  font-size: 14px;
+}
+
+.aw-link-card.aw-featured .aw-link-desc {
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+/* 主推卡图标（更大） */
+.aw-link-icon-wrap.aw-featured-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.aw-link-card.aw-featured:hover .aw-link-icon-wrap {
+  transform: scale(1.08);
+}
+
+/* ── 次要卡：竖向布局，撑满行高 ── */
+.aw-link-card.aw-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 16px 14px;
+}
+
+.aw-link-card.aw-compact:hover {
+  background: var(--info-bg);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.aw-link-card.aw-compact .aw-link-title {
+  font-size: 12.5px;
+}
+
+.aw-link-card.aw-compact .aw-link-desc {
+  font-size: 11px;
+  flex: 1;
+  line-height: 1.5;
+}
+
+/* 箭头贴底部右侧 */
+.aw-link-card.aw-compact .aw-link-arrow {
+  align-self: flex-end;
+}
+
+/* ── 图标容器（通用） ── */
+.aw-link-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    transform 0.2s;
+}
+
+.aw-link-card:hover .aw-link-icon-wrap {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  transform: scale(1.06);
+}
+
+/* ── SVG 文件图标（img + filter，主题自适应） ── */
+.aw-link-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  filter: brightness(0);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+:root[data-theme="dark"] .aw-link-svg {
+  filter: brightness(0) invert(1);
+}
+
+.aw-link-card:hover .aw-link-svg {
+  opacity: 0.9;
+}
+
+/* WikiIcon 使用 stroke="currentColor"，直接 color 控制 */
+.aw-link-icon-wrap svg {
+  color: var(--muted);
+  opacity: 0.6;
+  transition:
+    color 0.2s,
+    opacity 0.2s;
+}
+
+.aw-link-card:hover .aw-link-icon-wrap svg {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ── 文字区（水平卡用） ── */
+.aw-link-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.aw-link-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aw-link-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── 箭头图标 ── */
+.aw-link-arrow {
+  flex-shrink: 0;
+  color: var(--muted);
+  opacity: 0;
+  transform: translate(-3px, 3px);
+  transition:
+    opacity 0.2s,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aw-link-card:hover .aw-link-arrow {
+  opacity: 0.55;
+  transform: translate(0, 0);
+}
+
+/* ─────────────────────────────────────────
+   底栏（法律声明）
+   ───────────────────────────────────────── */
+.aw-content-footer {
+  padding: 10px 36px;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.3;
+  flex-shrink: 0;
+  text-align: right;
+  letter-spacing: 0.1px;
+  -webkit-app-region: drag;
+}
+
+/* ══════════════════════════════════════════════════════
+   面板 3（生态资源）— 快速参考区
+   ══════════════════════════════════════════════════════ */
+
+/* 次要卡片：有空间时拉伸，空间不足时向下让给 quickref */
+.aw-res-secondary {
+  flex: 1 1 0;
+  min-height: 80px;
+}
+
+/* ── 快速参考容器 ── */
+.aw-quickref {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+/* 分组标题 */
+.aw-qr-group {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--muted);
+  opacity: 0.38;
+  padding: 6px 6px 2px;
+}
+
+.aw-qr-group:first-child {
+  padding-top: 2px;
+}
+
+/* 每行：图标 + 标签 + 值 + 动作图标 */
+.aw-qr-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.aw-qr-item:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.aw-qr-item:hover .aw-qr-action {
+  opacity: 0.5;
+}
+
+.aw-qr-item:hover .aw-qr-icon {
+  opacity: 0.75;
+  color: var(--accent);
+}
+
+/* 左侧分类图标 */
+.aw-qr-icon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+  opacity: 0.38;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+
+/* 固定宽度标签，统一对齐 */
+.aw-qr-label {
+  flex-shrink: 0;
+  width: 54px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  opacity: 0.5;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+}
+
+/* 值：等宽字体，超长截断 */
+.aw-qr-val {
+  flex: 1;
+  min-width: 0;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Docker 命令行：前景色加重，暗示可复制 */
+.aw-qr-val.aw-qr-cmd {
+  color: var(--fg);
+  opacity: 0.7;
+}
+
+/* 右侧动作图标（hover 才显示） */
+.aw-qr-action {
+  flex-shrink: 0;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* quickref 在面板内使用时，与上方内容保持间距 */
+.aw-panel .aw-quickref {
+  margin-top: 20px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   检查更新面板  .aw-update-*
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 面板容器：垂直弹性布局，与其他面板等宽 */
+.aw-update-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 当前版本卡片：与侧边栏版本块风格一致
+   fix: var(--surface) 未定义，改用 var(--card) */
+.aw-update-ver-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.aw-update-ver-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.aw-update-ver-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aw-update-ver-dot.gui-dot {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.aw-update-ver-dot.core-dot {
+  background: var(--muted);
+  opacity: 0.45;
+}
+
+.aw-update-ver-label {
+  color: var(--muted);
+  font-size: 11px;
+  width: 60px;
+}
+
+.aw-update-ver-val {
+  font-family: "Fira Code", "Cascadia Code", monospace;
+  font-size: 11px;
+  color: var(--fg);
+}
+
+.aw-update-ver-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+/* 「检查更新」主按钮 */
+.aw-update-check-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
+  align-self: flex-start;
+}
+
+.aw-update-check-btn:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.aw-update-check-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.aw-update-check-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 检查中旋转动画 */
+.aw-update-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: aw-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes aw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 结果卡
+   fix: var(--surface) 未定义，改用 var(--card) */
+.aw-update-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* padding: 12px 14px; */
+  border-radius: 8px;
+  /* border: 1px solid var(--border); */
+  /* background: var(--card); */
+  font-size: 12.5px;
+}
+
+.aw-update-result.has-update {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.aw-update-result.error {
+  border-color: color-mix(in srgb, #e05252 55%, transparent);
+}
+
+.aw-update-result.up-to-date {
+  border-color: color-mix(in srgb, #4caf7d 55%, transparent);
+}
+
+/* 状态行：图标 + 文字 */
+.aw-update-state-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.aw-update-state-row.has-update {
+  color: var(--accent);
+}
+
+.aw-update-state-row.up-to-date {
+  color: #4caf7d;
+}
+
+.aw-update-state-row.error {
+  color: #e05252;
+}
+
+/* 更新详情卡片：一体化设计 (Header + Body) */
+
+/* 卡片外层容器 */
+.aw-update-details-card {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+/* ── 卡片头部 (铭牌) ── */
+.aw-update-meta-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  /* 头部背景微调，与下方主体拉开极其微弱的层次感 */
+  background: color-mix(in srgb, var(--border) 12%, var(--card));
+  border: 1px solid var(--border);
+  /* 底部使用微弱的线与主体拼接 */
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  border-radius: 6px 6px 0 0; /* 上方圆角，下方平角 */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.aw-update-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.aw-update-meta-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.aw-update-meta-val {
+  font-size: 10.5px;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.aw-update-meta-ext {
+  opacity: 0.45;
+}
+
+.aw-update-meta-divider {
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+  opacity: 0.4;
+}
+
+/* ── 卡片主体 (Release Notes) ── */
+.aw-update-notes {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none; /* 去掉上边框，让 Header 和 Body 无缝融合 */
+  border-radius: 0 0 6px 6px; /* 上方平角，下方圆角 */
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  max-height: 200px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+/* 细滚动条 */
+.aw-update-notes::-webkit-scrollbar {
+  width: 4px;
+}
+.aw-update-notes::-webkit-scrollbar-track {
+  background: transparent;
+}
+.aw-update-notes::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+.aw-update-notes::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* 标题：层级递减，首个标题去掉多余上边距 */
+.aw-update-notes h1,
+.aw-update-notes h2,
+.aw-update-notes h3,
+.aw-update-notes h4,
+.aw-update-notes h5,
+.aw-update-notes h6 {
+  margin: 10px 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+.aw-update-notes h1:first-child,
+.aw-update-notes h2:first-child,
+.aw-update-notes h3:first-child,
+.aw-update-notes h4:first-child,
+.aw-update-notes h5:first-child,
+.aw-update-notes h6:first-child {
+  margin-top: 0;
+}
+
+/* 段落与分隔线 */
+.aw-update-notes p {
+  margin: 4px 0;
+}
+
+.aw-update-notes hr {
+  margin: 10px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* 列表 */
+.aw-update-notes ul,
+.aw-update-notes ol {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.aw-update-notes li {
+  margin: 2px 0;
+}
+
+.aw-update-notes li > ul,
+.aw-update-notes li > ol {
+  margin: 2px 0;
+}
+
+/* 行内代码 */
+.aw-update-notes code {
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* 围栏代码块 */
+.aw-update-notes pre {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+  border-radius: 5px;
+  overflow-x: auto;
+}
+
+.aw-update-notes pre code {
+  background: none;
+  padding: 0;
+  color: var(--muted);
+}
+
+/* 链接 */
+.aw-update-notes a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.aw-update-notes a:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+/* 强调 */
+.aw-update-notes strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.aw-update-notes em {
+  font-style: italic;
+}
+
+.aw-update-notes del,
+.aw-update-notes s {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* 引用块 */
+.aw-update-notes blockquote {
+  margin: 6px 0;
+  padding: 2px 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+/* 图片（如 GitHub 用户头像/徽章） */
+.aw-update-notes img {
+  max-height: 18px;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+/* 表格 */
+.aw-update-notes table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.aw-update-notes th,
+.aw-update-notes td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.aw-update-notes th {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.aw-update-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 下载按钮 */
+.aw-update-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.aw-update-dl-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* 自动安装按钮 */
+.aw-update-auto-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.aw-update-auto-btn:hover {
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  border-color: var(--muted);
+  color: var(--fg);
+}
+
+/* 底部说明小字 */
+.aw-update-note {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.6;
+  line-height: 1.6;
+}

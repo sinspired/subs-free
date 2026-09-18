@@ -1,0 +1,84 @@
+# 根目录 version
+version: '3'
+
+vars:
+  APP_NAME: "Subs-Free"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  # build/Taskfile.yml 里的通用任务（build:server、build:docker 等根级别便捷任务）
+  # 默认按 desktop 处理——它们的 go build 已经显式指向 ./cmd/desktop，
+  # 这里的 APP_DIR 只是为了让它们依赖的 build:frontend 找得到 cmd/desktop/frontend。
+  common:
+    taskfile: ./build/Taskfile.yml
+    vars:
+      APP_DIR: cmd/desktop
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+  ios: ./build/ios/Taskfile.yml
+  android: ./build/android/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Alias for dev:mobile（保留旧用法；明确想跑桌面端用 dev:desktop）
+    cmds:
+      - task: dev:mobile
+
+  dev:mobile:
+    summary: 桌面预览窗口里跑 mobile 端 UI（wails3 dev 热重载），不是真机/模拟器
+    dir: cmd/mobile
+    cmds:
+      - wails3 dev -config ../../build/config.yml -port {{.VITE_PORT}}
+
+  dev:desktop:
+    summary: 桌面端 wails3 dev 热重载
+    dir: cmd/desktop
+    cmds:
+      - wails3 dev -config ../../build/config.yml -port {{.VITE_PORT}}
+
+  setup:docker:
+    summary: Builds Docker image for cross-compilation (~800MB download)
+    cmds:
+      - task: common:setup:docker
+
+  build:server:
+    summary: Builds the application in server mode (no GUI, HTTP server only)
+    cmds:
+      - task: common:build:server
+
+  run:server:
+    summary: Runs the application in server mode
+    cmds:
+      - task: common:run:server
+
+  build:docker:
+    summary: Builds a Docker image for server mode deployment
+    cmds:
+      - task: common:build:docker
+
+  run:docker:
+    summary: Builds and runs the Docker image
+    cmds:
+      - task: common:run:docker

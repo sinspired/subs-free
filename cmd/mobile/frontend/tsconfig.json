@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // 新增这两行，告诉 TS 编译器使用 Preact 的 JSX 转换
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": ["src", "bindings"]
+}

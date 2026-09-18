@@ -1,0 +1,289 @@
+/* frontend/public/sub-links.css
+   订阅链接窗口专属样式（500×420 紧凑卡片设计）
+   依赖 style.css 中定义的 CSS 变量与基础重置
+   ─────────────────────────────────────────── */
+
+@keyframes sl-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 根容器：撑满窗口 ── */
+.sl-root {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background: var(--card);
+  color: var(--fg);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── 标题栏（通用样式：适用于 Windows / Linux） ── */
+.sl-titlebar {
+  --wails-draggable: drag;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 💡 Windows/Linux 下不需要避让红绿灯，恢复正常的上下间距（例如 12px） */
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── macOS 专属适配 ── */
+.sl-titlebar.is-mac {
+  /* 💡 仅在 Mac 下预留 30px 高度，防止被左上角的交通灯（红绿灯）遮挡文本 */
+  padding-top: 30px;
+}
+
+.sl-titlebar-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.sl-titlebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.01em;
+}
+
+.sl-titlebar-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ── 访问地址切换（无外容器背景，仅胶囊高亮） ── */
+.sl-host-switch {
+  display: flex;
+  justify-content: center;
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+
+/* 移除所有背景、边框和玻璃效果，仅作为并排布局的容器 */
+.sl-tabs-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* 各个胶囊之间的间距 */
+}
+
+.sl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  /* 预留边框位，防止切换时文字抖动 */
+  border-radius: 14px;
+  /* 圆角调大到 14px，视觉上更像精致的药丸胶囊 */
+  background: transparent;
+  /* 默认完全透明，融入页面背景 */
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 鼠标悬浮时仅给一点微弱的提示 */
+.sl-tab:hover {
+  color: var(--fg);
+  background: rgba(128, 128, 128, 0.05);
+}
+
+/* 仅选中项拥有背景实体，形成视觉焦点 */
+.sl-tab.active {
+  background: var(--card);
+  /* 采用卡片底色（明亮模式下偏白，暗黑模式下偏深灰） */
+  border-color: var(--border);
+  /* 加上细边框勾勒轮廓 */
+  color: var(--fg);
+  font-weight: 500;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  /* 极轻柔的一丝投影 */
+}
+
+.sl-tab-ip {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.sl-tab-label {
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+/* ── 内容区 ── */
+.sl-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── 状态：加载中 / 错误 ── */
+.sl-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sl-status.error {
+  flex-direction: column;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 12px;
+  text-align: center;
+}
+
+.sl-status.error .sl-error-icon {
+  font-size: 20px;
+}
+
+/* 旋转动画（加载中） */
+@keyframes sl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sl-spinner {
+  animation: sl-spin 0.9s linear infinite;
+  color: var(--accent);
+}
+
+/* ── 每条链接行 ── */
+.sl-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  animation: sl-fade-in 0.2s ease both;
+}
+
+.sl-item:hover {
+  background: var(--info-bg);
+  border-color: var(--accent);
+}
+
+.sl-item:active {
+  transform: scale(0.985);
+}
+
+/* 已复制状态 */
+.sl-item.copied {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.sl-item-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: color 0.12s;
+}
+
+.sl-item:hover .sl-item-icon,
+.sl-item.copied .sl-item-icon {
+  color: var(--accent);
+}
+
+.sl-item.copied .sl-item-icon {
+  color: var(--success);
+}
+
+.sl-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sl-item-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-item-url {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.sl-item-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sl-copy-label {
+  font-size: 10px;
+  color: var(--muted);
+  transition: color 0.12s;
+}
+
+.sl-item.copied .sl-copy-label {
+  color: var(--success);
+}
+
+/* ── 品牌 PNG 图标（保留原色，深浅色模式均自然显示） ── */
+.sl-brand-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  object-fit: contain;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+
+.sl-item:hover .sl-brand-icon {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .sl-brand-icon {
+  opacity: 0.8;
+}
+
+:root[data-theme="dark"] .sl-item:hover .sl-brand-icon {
+  opacity: 1;
+}
+
+/* ── 底部提示 ── */
+.sl-footer {
+  padding: 8px 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+  flex-shrink: 0;
+}

@@ -1,0 +1,16 @@
+<resources>
+    <!-- 品牌主色 -->
+    <color name="primary">#0EA5A0</color>          <!-- 青绿色，强调色 -->
+    <color name="primary_dark">#0C7A76</color>    <!-- 深色变体 -->
+    <color name="accent">#FF9800</color>          <!-- 橙色强调 -->
+
+    <!-- 背景色 -->
+    <color name="background">#f2f4f6</color>      <!-- 白色 -->
+    <color name="background_dark">#111317</color> <!-- 深色背景 -->
+
+    <!-- 文字颜色 -->
+    <color name="text_primary">#111827</color>    <!-- 主文字 -->
+    <color name="text_secondary">#6B7280</color>  <!-- 次文字 -->
+    <color name="text_primary_dark">#E5E7EB</color>
+    <color name="text_secondary_dark">#9CA3AF</color>
+</resources>

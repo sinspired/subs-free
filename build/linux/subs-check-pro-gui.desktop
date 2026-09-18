@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=subs-check-pro-gui
+Exec=subs-check-pro-gui
+Icon=subs-check-pro-gui
+Categories=Development;
+Terminal=false
+Keywords=proxy check
+Version=1.0
+StartupNotify=false
