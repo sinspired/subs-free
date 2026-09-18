@@ -1,5 +1,4 @@
 // Package updater
-// 
 // 处理自动更新的代理、匹配规则等
 package updater
 
@@ -17,9 +16,9 @@ var archAliases = map[string][]string{
 	"386":   {"386", "x86", "i386", "ia32"},
 }
 
-// tokenize 将文件名按 "_" 和 "." 切分为小写 token，
-// 例如 "subs-free_v1.0.0_windows_x64_setup.exe"
-//   → ["subs-free", "v1", "0", "0", "windows", "x64", "setup", "exe"]
+// tokenize 将文件名按 "_"、"-" 和 "." 切分为小写 token，
+// 例如 "subs-free_windows_x64_setup.exe"
+//   → ["subs", "free", "windows", "x64", "setup", "exe"]
 func tokenize(name string) []string {
 	s := strings.ToLower(name)
 	s = strings.NewReplacer(".", "_", "-", "_").Replace(s)
@@ -35,6 +34,7 @@ func hasToken(tokens []string, want string) bool {
 	return false
 }
 
+// matchesPlatformArch 检查文件名是否同时包含平台标识和架构标识
 func matchesPlatformArch(name, platform, arch string) bool {
 	tokens := tokenize(name)
 	if !hasToken(tokens, platform) {
@@ -53,6 +53,7 @@ func matchesPlatformArch(name, platform, arch string) bool {
 }
 
 // AssetMatcher 是 github.Config 的 AssetMatcher 字段值。
+// 帮助 Wails 准确从一堆混杂了 APK、DMG、DEB 的 Release 列表中找到合适的自更新包
 func AssetMatcher(req updater.CheckRequest, assets []github.ReleaseAsset) int {
 	platform := strings.ToLower(req.Platform) // windows / darwin / linux
 	arch := strings.ToLower(req.Arch)         // amd64 / arm64 / 386
@@ -71,6 +72,22 @@ func AssetMatcher(req updater.CheckRequest, assets []github.ReleaseAsset) int {
 		for i, a := range assets {
 			if matchesPlatformArch(a.Name, platform, arch) &&
 				strings.HasSuffix(strings.ToLower(a.Name), ".exe") {
+				return i
+			}
+		}
+		return -1
+
+	case "darwin":
+		// macOS：优先选 .tar.gz（Wails updater 能解压覆盖），跳过无法直接覆盖的 .dmg
+		for i, a := range assets {
+			if matchesPlatformArch(a.Name, platform, arch) &&
+				strings.HasSuffix(strings.ToLower(a.Name), ".tar.gz") {
+				return i
+			}
+		}
+		// 退化：只要匹配平台和架构的都行
+		for i, a := range assets {
+			if matchesPlatformArch(a.Name, platform, arch) {
 				return i
 			}
 		}
