@@ -4,7 +4,7 @@ includes:
   common:
     taskfile: ../Taskfile.yml
     vars:
-      APP_DIR: '{{.ROOT_DIR}}/cmd/mobile'
+      APP_DIR: '../../cmd/mobile'
 
 # Platform selection:
 #   task ios:package                          -> simulator bundle (ad-hoc signed)

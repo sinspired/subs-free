@@ -4,7 +4,7 @@ includes:
   common:
     taskfile: ../Taskfile.yml
     vars:
-      APP_DIR: '{{.ROOT_DIR}}/cmd/desktop'
+      APP_DIR: '../../cmd/desktop'
 
 vars:
   # Signing configuration - edit these values for your project

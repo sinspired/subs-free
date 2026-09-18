@@ -1,5 +1,5 @@
 // frontend/src/wails-bridge.ts
-import { GuiApp } from "../bindings/github.com/sinspired/subs-free";
+import { GuiApp } from "../bindings/github.com/sinspired/subs-free/cmd/mobile";
 import { Events } from "@wailsio/runtime"; // 引入 Events
 
 declare global {

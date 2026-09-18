@@ -1,7 +1,7 @@
 // frontend/src/App.tsx
 import { h, Fragment } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { GuiApp } from "../bindings/github.com/sinspired/subs-free";
+import { GuiApp } from "../bindings/github.com/sinspired/subs-free/cmd/mobile";
 
 // --- Types ---
 interface AppInfo {
@@ -91,7 +91,7 @@ export function App() {
       try {
         const sa = await GuiApp.GetSafeArea();
         if (sa) {
-          // 写入 CSS 变量，单位为 px 
+          // 写入 CSS 变量，单位为 px
           document.documentElement.style.setProperty("--sa-top", `${sa.top}px`);
           document.documentElement.style.setProperty("--sa-bottom", `${sa.bottom}px`);
           document.documentElement.style.setProperty("--sa-left", `${sa.left}px`);

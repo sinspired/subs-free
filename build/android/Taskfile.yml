@@ -4,7 +4,7 @@ includes:
   common:
     taskfile: ../Taskfile.yml
     vars:
-      APP_DIR: '{{.ROOT_DIR}}/cmd/mobile'
+      APP_DIR: '../../cmd/mobile'
 
 vars:
   APP_ID: '{{.APP_ID | default "com.sinspired.subs_free"}}'
