@@ -17,7 +17,7 @@ homepage: "https://github.com/sinspired/subs-free"
 license: "MIT"
 release: "1"
 contents:
-  - src: "./bin/subs-free"
+  - src: "./bin/Subs-Free"
     dst: "/usr/local/bin/subs-free"
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/subs-free.png"
