@@ -142,7 +142,8 @@ export function App() {
     try {
       const data = await GuiApp.GetAppInfo();
       if (data && data.apiKey) {
-        localStorage.setItem("subscheck_api_key", data.apiKey);
+        localStorage.setItem("scp_api_key", data.apiKey);
+        sessionStorage.setItem("scp_api_key", data.apiKey);
       }
 
       if (data.initErr) {
@@ -388,7 +389,8 @@ export function App() {
         return { ...prev, apiKey: newKey, keyIsRandom: false };
       });
 
-      localStorage.setItem("subscheck_api_key", newKey);
+      localStorage.setItem("scp_api_key", newKey);
+      sessionStorage.setItem("scp_api_key", newKey);
 
       // 编辑成功：恢复为隐藏状态、退出编辑模式，并触发一次短暂的成功动画
       setKeyShown(false);

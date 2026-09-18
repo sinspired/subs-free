@@ -245,7 +245,7 @@ func handleWebUITemplate(w http.ResponseWriter, path string, configPath string) 
 	// 直接 import 绑定，所以在这里用普通 <script src> 引入。必须放在内联脚本之前，
 	// 保证 window.WailsBridge 在 admin.js 等页面脚本执行前已经就绪。
 	bridgeScript := `<script src="/wails-bridge.js"></script>`
-	guiScript := fmt.Sprintf(`<script>(()=>{const k=%s;window.__WAILS_GUI={apiKey:k,listenPort:%s,baseURL:"http://127.0.0.1:%s"};try{sessionStorage.setItem('subscheck_api_key',k)}catch(e){}})();</script>`, keyJSON, portJSON, port)
+	guiScript := fmt.Sprintf(`<script>(()=>{const k=%s;window.__WAILS_GUI={apiKey:k,listenPort:%s,baseURL:"http://127.0.0.1:%s"};try{sessionStorage.setItem('scp_api_key',k);sessionStorage.setItem('scp_api_key',k)}catch(e){}})();</script>`, keyJSON, portJSON, port)
 	guiScript = bridgeScript + guiScript
 
 	html := strings.Replace(buf.String(), "</head>", guiScript+"</head>", 1)

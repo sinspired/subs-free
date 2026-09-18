@@ -612,7 +612,10 @@ func (g *GuiApp) OpenInternalPage(path string, title string, windowSize string) 
 	}
 
 	nonce := generateNonce(config.GlobalConfig.APIKey, false)
-	targetURL := baseURL + "/gui/enter?n=" + nonce + "&redirect=" + path
+
+	// 使用 url.QueryEscape 对 path 进行编码
+	// 防止 path 中本身带有 ?theme=dark 等参数时，破坏完整的 GET 参数结构
+	targetURL := baseURL + "/gui/enter?n=" + nonce + "&redirect=" + url.QueryEscape(path)
 
 	wailsApp := application.Get()
 	if wailsApp == nil {
