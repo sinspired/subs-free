@@ -1,3 +1,4 @@
+# build\android\Taskfile.yml
 version: '3'
 
 includes:
@@ -342,13 +343,16 @@ tasks:
   generate:android:overlay:
     internal: true
     summary: Generate Go build overlay that registers the Android main
+    # 改变当前任务的工作目录到真实的 Go 入口，欺骗 wails3 使其生成包含 cmd/mobile 路径的 key
+    dir: '{{.ROOT_DIR}}/cmd/mobile'
     sources:
-      - build/config.yml
+      # 因为切换了工作目录，原有的相对路径需要修改为基于 ROOT_DIR 的绝对路径
+      - '{{.ROOT_DIR}}/build/config.yml'
     generates:
-      - build/android/overlay.json
-      - build/android/gen/main_android.gen.go
+      - '{{.ROOT_DIR}}/build/android/overlay.json'
+      - '{{.ROOT_DIR}}/build/android/gen/main_android.gen.go'
     cmds:
-      - wails3 android overlay:gen -out build/android/overlay.json -config build/config.yml
+      - wails3 android overlay:gen -out '{{.ROOT_DIR}}/build/android/overlay.json' -config '{{.ROOT_DIR}}/build/config.yml'
 
   generate:android:bindings:
     internal: true
@@ -557,3 +561,4 @@ tasks:
       - rm -rf build/android/app/build
       - rm -rf build/android/app/src/main/jniLibs/*/libwails.so
       - rm -rf build/android/.gradle
+      - rm -rf build/android/overlay.json
