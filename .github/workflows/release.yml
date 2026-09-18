@@ -3,14 +3,14 @@ name: Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 env:
-  PRERELEASE_REGEX: "-(alpha|beta|rc|preview|nightly)"
+  PRERELEASE_REGEX: '-(alpha|beta|rc|preview|nightly)'
 
 # 产物命名规范（用户可见架构名统一用 x64/arm64/x86）：
 #   APP_NAME_<goos>_<arch>[_variant][.ext]
@@ -43,12 +43,12 @@ jobs:
         id: prev_tag
         run: |
           if [[ "${{ steps.release_type.outputs.type }}" == "stable" ]]; then
-            # 稳定版：只找上一个稳定版 (注意加上 --)
+            # 稳定版：只找上一个稳定版
             prev=$(git tag --list "v[0-9]*" --sort=-version:refname \
               | grep -Ev -- "${{ env.PRERELEASE_REGEX }}" \
               | grep -v -- "${GITHUB_REF_NAME}" | head -n1)
           else
-            # 预览版：找上一个任意 tag (注意加上 --)
+            # 预览版：找上一个任意 tag
             prev=$(git tag --list "v[0-9]*" --sort=-version:refname \
               | grep -v -- "${GITHUB_REF_NAME}" | head -n1)
           fi
@@ -95,7 +95,7 @@ jobs:
             | awk '{print $2}' | tr -d '[:space:]')
 
           if [ -z "${CORE_VERSION}" ]; then
-            echo "⚠️  subs-check-pro/v2 not found in go.mod, falling back to dev"
+            echo "⚠️  subs-check-pro/v3 not found in go.mod, falling back to dev"
             CORE_VERSION="dev"
             CORE_COMMIT="unknown"
           else
@@ -124,7 +124,7 @@ jobs:
           echo "commit=${CORE_COMMIT}"   >> "$GITHUB_OUTPUT"
           echo "core_version=${CORE_VERSION}  core_commit=${CORE_COMMIT}"
 
-  # 3. Android 构建（独立 job：工具链和桌面完全不同，用 go-task 的 android: 命名空间）
+  # 2. Android 构建 (独立的工具链)
   build-android:
     name: Build (android/${{ matrix.arch }})
     needs: changelog
@@ -132,13 +132,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 覆盖 99%+ 真实设备，Play Store 上传也用这个架构
           - arch: arm64
-          # 提供给模拟器/极少数 x86_64 设备使用，非必须，觉得没用可以整段删掉
           - arch: amd64
 
     runs-on: ubuntu-latest
-
     env:
       APP_NAME: subs-free
       VERSION: ${{ github.ref_name }}
@@ -151,32 +148,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve GUI version
-        shell: bash
-        run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            GUI_VER="${{ github.ref_name }}"
-          else
-            GUI_VER=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
-          fi
-          echo "GUI_VERSION=${GUI_VER}" >> "$GITHUB_ENV"
-          echo "✅ GUI_VERSION=${GUI_VER}"
-
-      - name: Setup Go
+      - name: Setup Go & Node & Java
         uses: actions/setup-go@v7
         with:
           go-version: stable
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-
-      - name: Setup Java (Gradle 需要)
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: '21'
 
       # ubuntu-latest runner 自带 Android SDK cmdline-tools/platform-tools，
       # 但 NDK 版本不一定装了，这里显式装一个锁定版本，保证可复现构建。
@@ -252,18 +234,19 @@ jobs:
             exit 1
           fi
 
+          # 重命名策略：subs-free_arm64.apk 和 subs-free_lite_arm64.apk
           for apk in "${apks[@]}"; do
             base=$(basename "${apk}")
             if [[ "${base}" == *-Lite.apk ]]; then
-              dest="dist/${APP_NAME}_android_${ARCH_NAME}_lite.apk"
+              dest="dist/${APP_NAME}_lite_${ARCH_NAME}.apk"
             else
-              dest="dist/${APP_NAME}_android_${ARCH_NAME}.apk"
+              dest="dist/${APP_NAME}_${ARCH_NAME}.apk"
             fi
             cp "${apk}" "${dest}"
             echo "✅ ${apk} -> ${dest}"
           done
 
-          echo "=== dist/ contents ==="
+          echo "Android 构建列表"
           ls -lah dist/
 
       - name: Upload Artifacts
@@ -273,7 +256,7 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # 4. Desktop 构建（独立 job：windows/darwin/linux 矩阵，和 android 工具链完全不同）
+  # 3. Desktop 构建 (Windows / macOS / Linux)
   build-desktop:
     name: Build (${{ matrix.goos }}/${{ matrix.arch }})
     needs: changelog # 等 changelog 生成完再开始
@@ -309,15 +292,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
-      APP_NAME: Subs-Free
+      APP_NAME: subs-free
       # github.ref_name = tag name on tag push, branch name on workflow_dispatch
       VERSION: ${{ github.ref_name }}
       # 从 changelog job 获取已解析好的内核版本，避免 Taskfile 重复网络拉取
       CORE_VERSION: ${{ needs.changelog.outputs.core_version }}
       CORE_COMMIT: ${{ needs.changelog.outputs.core_commit }}
-      # GUI_VERSION 通过 "Resolve GUI version" 步骤写入 GITHUB_ENV，此处不硬编码
-      # tag push → github.ref_name；workflow_dispatch → git describe --tags --abbrev=0
-      # GUI_VERSION: ${{ github.ref_name }}
 
     steps:
       - name: Checkout
@@ -325,25 +305,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      # tag push → ref_name 即版本号；workflow_dispatch → git describe 取最近 tag
-      - name: Resolve GUI version
-        shell: bash
-        run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            GUI_VER="${{ github.ref_name }}"
-          else
-            GUI_VER=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
-          fi
-          echo "GUI_VERSION=${GUI_VER}" >> "$GITHUB_ENV"
-          echo "✅ GUI_VERSION=${GUI_VER}"
-
-      - name: Setup Go
+      - name: Setup Go & Node
         uses: actions/setup-go@v7
         with:
           go-version: stable
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -362,18 +328,7 @@ jobs:
           echo "$mingwPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Write-Host "✅ MinGW 已安装，路径: $mingwPath"
 
-      # ── Linux：GTK4 / WebKitGTK 依赖 ──
-      - name: Install Linux Dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libgtk-4-dev \
-            libwebkitgtk-6.0-dev
-
-      # ── Windows：NSIS 打包器（用于生成安装包）──
+      # Windows：NSIS 打包器（用于生成安装包）
       - name: Install NSIS
         id: install_nsis
         if: runner.os == 'Windows'
@@ -396,8 +351,14 @@ jobs:
             exit 1
           }
 
-      # macOS：安装 create-dmg
-      - name: Install create-dmg
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install create-dmg (macOS)
         if: runner.os == 'macOS'
         run: brew install create-dmg
 
@@ -407,50 +368,23 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
-      # Windows：先 build → 再 package（NSIS）
-      - name: Build (Windows)
+      - name: Build & Package (Windows)
         if: runner.os == 'Windows'
-        run: task windows:build
-        env:
-          ARCH: ${{ matrix.arch }}
+        run: |
+          task windows:build ARCH=${{ matrix.arch }}
+          task windows:package ARCH=${{ matrix.arch }}
 
-      - name: Package Windows (NSIS installer)
-        if: runner.os == 'Windows'
-        # task windows:package 调用 create:nsis:installer
-        # 输出：bin/Subs-Free-amd64-installer.exe
-        run: task windows:package
-        env:
-          ARCH: ${{ matrix.arch }}
-
-      # macOS：先打 .app bundle，再生成 DMG
-      - name: Package macOS (.app bundle)
+      - name: Build & Package (macOS)
         if: runner.os == 'macOS'
-        # task darwin:package 调用 create:app:bundle
-        # 输出：bin/Subs-Free.app/
-        run: task darwin:package
-        env:
-          ARCH: ${{ matrix.arch }}
+        run: |
+          task darwin:package ARCH=${{ matrix.arch }}
+          task darwin:create:dmg ARCH=${{ matrix.arch }}
 
-      - name: Create macOS DMG
-        if: runner.os == 'macOS'
-        run: task darwin:create:dmg
-        env:
-          ARCH: ${{ matrix.arch }}
-
-      # Linux：先 build → 再生成 .deb
-      - name: Build (Linux)
+      - name: Build & Package (Linux)
         if: runner.os == 'Linux'
-        run: task linux:build
-        env:
-          ARCH: ${{ matrix.arch }}
-
-      - name: Package Linux (.deb)
-        if: runner.os == 'Linux'
-        run: task linux:create:deb
-        env:
-          ARCH: ${{ matrix.arch }}
-          GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ github.ref_name != '' && github.ref_name || 'dev' }}
+        run: |
+          task linux:build ARCH=${{ matrix.arch }}
+          task linux:create:deb ARCH=${{ matrix.arch }} VERSION=${{ github.ref_name != '' && github.ref_name || 'dev' }}
 
       # 统一整理产物，重命名为规范格式
       - name: Collect and Rename Artifacts
@@ -461,9 +395,6 @@ jobs:
         run: |
           mkdir -p dist
 
-          # 命名前缀：APP_NAME_GOOS_ARCH
-          # 用户可见架构名统一为 x64/arm64/x86，
-          # Go 内部 GOARCH（amd64 等）保持不变，仅在此处做"展示名"映射
           case "${GOARCH}" in
             amd64) ARCH_NAME="x64" ;;
             arm64) ARCH_NAME="arm64" ;;
@@ -473,49 +404,24 @@ jobs:
           PREFIX="${APP_NAME}_${GOOS}_${ARCH_NAME}"
 
           case "${GOOS}" in
-
             windows)
-              # 1. 便携版（裸二进制）
               cp "bin/${APP_NAME}.exe" "dist/${PREFIX}.exe"
-
-              # 2. NSIS 安装包（OutFile 输出到 bin/<name>-<arch>-installer.exe）
               NSIS_SRC="bin/${APP_NAME}-${GOARCH}-installer.exe"
-              if [ -f "${NSIS_SRC}" ]; then
-                cp "${NSIS_SRC}" "dist/${PREFIX}-setup.exe"
-              else
-                echo "⚠️  NSIS installer not found at ${NSIS_SRC}, skipping"
-              fi
+              if [ -f "${NSIS_SRC}" ]; then cp "${NSIS_SRC}" "dist/${PREFIX}_setup.exe"; fi
               ;;
-
             darwin)
-              # 用 -C 指定源目录，避免 cd 改变工作目录导致后续 ls dist/ 失败
               tar czf "dist/${PREFIX}.app.tar.gz" -C bin "${APP_NAME}.app"
-
-              # DMG（推荐，拖拽安装体验）
               DMG_SRC="bin/${APP_NAME}.dmg"
-              if [ -f "${DMG_SRC}" ]; then
-                cp "${DMG_SRC}" "dist/${PREFIX}.dmg"
-              else
-                echo "⚠️  DMG not found at ${DMG_SRC}, skipping"
-              fi
+              if [ -f "${DMG_SRC}" ]; then cp "${DMG_SRC}" "dist/${PREFIX}.dmg"; fi
               ;;
-
             linux)
-              # 1. 裸二进制（便携版）
               cp "bin/${APP_NAME}" "dist/${PREFIX}"
-
-              # 2. .deb 包
               DEB_SRC=$(ls bin/*.deb 2>/dev/null | head -1)
-              if [ -n "${DEB_SRC}" ]; then
-                cp "${DEB_SRC}" "dist/${PREFIX}.deb"
-              else
-                echo "⚠️  .deb not found in bin/, skipping"
-              fi
+              if [ -n "${DEB_SRC}" ]; then cp "${DEB_SRC}" "dist/${PREFIX}.deb"; fi
               ;;
-
           esac
 
-          echo "=== dist/ contents ==="
+          echo "构建列表"
           ls -lah dist/
 
       - name: Upload Artifacts
@@ -525,7 +431,7 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # 5. 汇总产物（android + desktop）→ 创建 GitHub Release
+  # 4. 汇总产物 → 创建 Release
   release:
     name: Create GitHub Release
     needs: [changelog, build-android, build-desktop]
@@ -539,7 +445,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # merge-multiple 把各 artifact 子目录打平到同一目录
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
@@ -548,7 +453,7 @@ jobs:
 
       - name: List release files
         run: |
-          echo "=== Release files ==="
+          echo "发布文件列表"
           ls -lah dist/
 
       # ── 生成 SHA256SUMS（供 Wails updater ChecksumAsset 验证）──
