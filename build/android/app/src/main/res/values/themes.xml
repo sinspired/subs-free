@@ -1,7 +1,7 @@
 <resources>
 
     <!-- 主主题 (浅色模式) -->
-    <style name="Theme.SubsCheckProGUI" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.subs_free" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
@@ -27,10 +27,10 @@
     </style>
 
     <!-- 夜间模式覆盖 -->
-    <style name="Theme.SubsCheckProGUI.Dark" parent="Theme.SubsCheckProGUI">
+    <style name="Theme.subs_free.Dark" parent="Theme.subs_free">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        
+
         <item name="android:windowBackground">@color/background_dark</item>
         <item name="android:textColorPrimary">@color/text_primary_dark</item>
         <item name="android:textColorSecondary">@color/text_secondary_dark</item>

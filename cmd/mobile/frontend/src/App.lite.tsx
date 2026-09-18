@@ -539,7 +539,7 @@ export function App() {
         <div class="logo-box"><img src="/static/icon/subs-check-pro.svg" alt="Logo" /></div>
         <div class="slogan">高性能网络节点检测管理引擎</div>
         <div class="lp-footer">
-          <a class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro-gui")}>
+          <a class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>
             GUI&nbsp;{info?.guiVersion || "dev"}
           </a>
           <span class="ver-dot">·</span>
@@ -749,7 +749,7 @@ export function App() {
             <div class="about-title-mobile">Subs Free</div>
             <div class="about-desc-mobile">基于 Subs Check Pro v3 内核的高性能网络节点检测和管理客户端</div>
             <div class="lp-footer" style={{ marginTop: '12px' }}>
-              <span class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro-gui")}>GUI&nbsp;{info?.guiVersion || "dev"}</span>
+              <span class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>GUI&nbsp;{info?.guiVersion || "dev"}</span>
               <span class="ver-dot">·</span>
               <span class="ver-tag ver-core" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro")}>内核&nbsp;{info?.coreVersion || "dev"}</span>
             </div>
@@ -769,7 +769,7 @@ export function App() {
                 <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro-gui")}>
+            <div class="aw-link-card" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>

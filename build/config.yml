@@ -8,11 +8,11 @@ info:
   companyName: "sinspired" # The name of the company
   productName: "subs-free" # The name of the application
   productIdentifier: "com.sinspired.subs_free" # The unique product identifier
-  description: "Subs-Check-Pro 移动版" # The application description
+  description: "Subs Free APP" # The application description
   copyright: "(c) 2025, sinspired" # Copyright text
-  comments: "跨平台现代 GUI 客户端，基于 Subs Check PRO 内核，本地原生界面 + WebUI，可远程管理，后台运行，支持开机自启。" # Comments
+  comments: "跨平台现代 GUI 客户端，基于 Subs Check PRO v3内核，本地原生界面 + WebUI，可远程管理，后台运行，支持开机自启。" # Comments
   version: "1.0.0" # The application version
-  
+
 # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
 #                               # Should match the name of your .icon file without the extension
 #                               # If not set and Assets.car exists, defaults to "appicon"

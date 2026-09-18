@@ -55,7 +55,7 @@ func sendOSNotification(title, message string) {
 		}
 
 		if err := appNotifier.SendNotification(notifications.NotificationOptions{
-			ID:    "subs-check-pro",
+			ID:    "subs-free",
 			Title: title,
 			Body:  message,
 		}); err != nil {

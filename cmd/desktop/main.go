@@ -59,7 +59,7 @@ func main() {
 
 		// 第二次启动时：唤醒第一实例
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID:      "com.sinspired.subs-free",
+			UniqueID:      "com.sinspired.subs_free",
 			EncryptionKey: singleInstanceKey,
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				slog.Debug("收到第二实例唤醒", "args", data.Args)
@@ -90,7 +90,7 @@ func main() {
 			CurrentVersion: currentVer,
 			Providers:      []updater.Provider{ghProvider},
 			CheckInterval:  6 * time.Hour,
-			Window:         updater.WindowNone,  // 不弹窗
+			Window:         updater.WindowNone, // 不弹窗
 		}); err != nil {
 			slog.Warn("Updater: Init 失败", "error", err)
 		} else {

@@ -209,7 +209,7 @@ func toNumericVersion(version string) string {
 
 // assemblyIdentityRe 只替换目标程序自身的 assemblyIdentity version 属性，
 // 不影响其后的依赖项（如 Microsoft.Windows.Common-Controls）。
-var assemblyIdentityRe = regexp.MustCompile(`(name="com\.sinspired\.subs-check-pro-gui"\s+version=")[^"]*"`)
+var assemblyIdentityRe = regexp.MustCompile(`(name="com\.sinspired\.subs_free"\s+version=")[^"]*"`)
 
 func genSyso(infoIn, manifestIn, infoOut, manifestOut, version string) {
 	numeric := toNumericVersion(version)

@@ -14,7 +14,7 @@
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>subs-check-pro-gui</DisplayName>
+    <DisplayName>Subs Free</DisplayName>
     <PublisherDisplayName>Sinspired</PublisherDisplayName>
     <Description>A modern GUI of Subs-Check-Pro</Description>
     <Logo>Assets\StoreLogo.png</Logo>

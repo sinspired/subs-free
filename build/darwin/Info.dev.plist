@@ -5,16 +5,16 @@
 		<key>CFBundleExecutable</key>
 		<string>subs-free</string>
 		<key>CFBundleGetInfoString</key>
-		<string>A modern GUI of Subs-Check-Pro, for high-performance proxy management, check, and
+		<string>A modern GUI of Subs-Check-Pro v3, for high-performance proxy management, check, and
 			subscription management and generation</string>
 		<key>CFBundleIconFile</key>
 		<string>icons</string>
 		<key>CFBundleIconName</key>
 		<string>appicon</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.sinspired.subs-check-pro-gui</string>
+		<string>com.sinspired.subs_free</string>
 		<key>CFBundleName</key>
-		<string>subs-check-pro-gui</string>
+		<string>subs-free</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

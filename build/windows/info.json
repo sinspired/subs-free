@@ -4,21 +4,21 @@
 	},
 	"info": {
 		"0000": {
-			"ProductName": "Subs-Check-Pro GUI",
+			"ProductName": "Subs Free",
 			"ProductVersion": "1.0.0-alpha.97",
 			"CompanyName": "sinspired",
-			"InternalName": "subs-check-pro-gui",
-			"OriginalFilename": "subs-check-pro-gui.exe",
+			"InternalName": "subs-free",
+			"OriginalFilename": "subs-free.exe",
 			"LegalCopyright": "(c) 2026 sinspired",
 			"LegalTrademarks": "sinspired"
 		},
 		"0804": {
-			"FileDescription": "Subs-Check-Pro 桌面端",
-			"Comments": "Subs-Check-Pro 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
+			"FileDescription": "Subs Free 桌面端",
+			"Comments": "Subs Free 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
 		},
 		"0404": {
-			"FileDescription": "Subs-Check-Pro 桌面端",
-			"Comments": "Subs-Check-Pro 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
+			"FileDescription": "Subs Free 桌面端",
+			"Comments": "Subs Free 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
 		}
 	}
 }

@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=subs-check-pro-gui
-Exec=subs-check-pro-gui
-Icon=subs-check-pro-gui
+Name=subs-free
+Exec=subs-free
+Icon=subs-free
 Categories=Development;
 Terminal=false
 Keywords=proxy check

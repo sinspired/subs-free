@@ -12,9 +12,9 @@
 		<key>CFBundleIconName</key>
 		<string>appicon</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.sinspired.subs-check-pro-gui</string>
+		<string>com.sinspired.subs_free</string>
 		<key>CFBundleName</key>
-		<string>subs-check-pro-gui</string>
+		<string>subs-free</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
