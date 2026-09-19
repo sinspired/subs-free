@@ -2,7 +2,7 @@
 
 # Subs Free
 
-基于 [Wails v3](https://v3.wails.io/) 构建，为 [subs-check-pro](https://github.com/sinspired/subs-check-pro) 提供的跨平台客户端程序，支持 Android 手机应用。
+基于 [Wails v3](https://v3.wails.io/) 构建，为 [subs-check-pro](https://github.com/sinspired/subs-check-pro) 提供的跨平台客户端程序，支持 `Android 手机应用`，支持`Windws` `Linux` `Mac`。
 
 [![Go](https://img.shields.io/github/go-mod/go-version/sinspired/subs-free)](https://go.dev/)
 [![Wails](https://img.shields.io/badge/Wails-v3.0.0--alpha-red?logo=wails)](https://v3.wails.io/)
@@ -16,11 +16,13 @@
 
 ![preview](./doc/GUI.png)
 
-### 📱 手机 APP
+### 📱 移动端
 
-| Android 完整版                                            | Android 精简版                                                      |
-| --------------------------------------------------------- | ------------------------------------------------------------------- |
-| <img src="./doc/Android.png" alt="Android" height="600"/> | <img src="./doc/Android_Lite.png" alt="Android_Lite" height="600"/> |
+> 深受国产厂商荼毒的设备，请使用 `Lite` 版
+
+| Android 完整版                               | Android 精简版                                         |
+| -------------------------------------------- | ------------------------------------------------------ |
+| <img src="./doc/Android.png" alt="Android"/> | <img src="./doc/Android_Lite.png" alt="Android_Lite"/> |
 
 ## ✨ 特性
 
