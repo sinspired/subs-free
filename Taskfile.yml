@@ -1,10 +1,11 @@
-# 根目录 version
 version: '3'
+
 vars:
   APP_NAME: "subs-free"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
   # Target OS for build/package/run. Defaults to the host OS, and is overridden
 
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
@@ -63,6 +64,7 @@ tasks:
     summary: Runs the application
     cmds:
       - task: "{{.GOOS}}:run"
+
   dev:
     summary: Alias for dev:mobile（保留旧用法；明确想跑桌面端用 dev:desktop）
     cmds:
@@ -77,22 +79,32 @@ tasks:
     dir: cmd/desktop
     cmds:
       - wails3 dev -config ../../build/config.yml -port {{.VITE_PORT}}
+
+  install:msix:tools:
+    summary: Installs tools required for Windows MSIX packaging
+    cmds:
+      - task: windows:install:msix:tools
+
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
     cmds:
       - task: common:setup:docker
+
   build:server:
     summary: Builds the application in server mode (no GUI, HTTP server only)
     cmds:
       - task: common:build:server
+
   run:server:
     summary: Runs the application in server mode
     cmds:
       - task: common:run:server
+
   build:docker:
     summary: Builds a Docker image for server mode deployment
     cmds:
       - task: common:build:docker
+
   run:docker:
     summary: Builds and runs the Docker image
     cmds:
