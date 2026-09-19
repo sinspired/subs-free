@@ -1,19 +1,19 @@
-/* frontend/public/style.css — Subs Check Pro 登录窗口样式 */
+/* frontend/public/style.css — Subs Free 登录窗口样式 */
 
 /* ── CSS 变量（主题） ── */
 :root {
   font-family:
-    "Inter",
+    'Inter',
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
-    "Roboto",
-    "Oxygen",
-    "Ubuntu",
-    "Cantarell",
-    "Fira Sans",
-    "Droid Sans",
-    "Helvetica Neue",
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
     sans-serif;
   font-size: 16px;
   line-height: 24px;
@@ -52,7 +52,7 @@
   --card-pad: 22px 24px 20px;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --bg: #111317;
   --card: #15171b;
   --fg: #e5e7eb;
@@ -79,8 +79,8 @@ body {
   background: var(--card);
   color: var(--fg);
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   transition:
@@ -280,7 +280,7 @@ button:focus-visible {
 }
 .key-text {
   flex: 1;
-  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 11.5px;
   word-break: break-all;
   cursor: pointer;
@@ -336,7 +336,7 @@ button:focus-visible {
   font-weight: 600;
   color: var(--muted);
   opacity: 0.55;
-  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -544,7 +544,7 @@ button:focus-visible {
 .cfg-path-text {
   flex: 1;
   min-width: 0;
-  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 10.5px;
   font-weight: 300;
   color: var(--muted);
@@ -628,7 +628,7 @@ code {
   border-radius: 3px;
   padding: 1px 4px;
   font-size: 11px;
-  font-family: "Fira Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Consolas', monospace;
 }
 
 /* ── Toast ── */
@@ -636,7 +636,7 @@ code {
   position: fixed;
   top: 10px; /* 顶部 */
   left: 10px; /* 靠左 */
-  /* 
+  /*
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
@@ -864,7 +864,7 @@ code {
 
 /* 竖线：上下留出空白，不贯穿到顶底 */
 .brand-panel::after {
-  content: "";
+  content: '';
   position: absolute;
   right: 0;
   top: 0px;
@@ -981,7 +981,7 @@ code {
   color: var(--accent);
 }
 .brand-autostart.update-available::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 3px;
   right: 3px;
@@ -1037,7 +1037,7 @@ code {
   /* 浅色主题：保持原始黑色；深色主题由下方规则翻转为白色 */
   filter: brightness(0);
 }
-:root[data-theme="dark"] .brand-social-icon {
+:root[data-theme='dark'] .brand-social-icon {
   filter: brightness(0) invert(1);
 }
 
@@ -1248,7 +1248,7 @@ code {
 
 .about-ver-val {
   font-size: 11px;
-  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   color: var(--muted);
   cursor: pointer;
   opacity: 0.7;
@@ -1320,7 +1320,7 @@ code {
 .about-link-label {
   flex: 1;
   font-size: 11.5px;
-  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

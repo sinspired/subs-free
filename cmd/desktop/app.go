@@ -164,7 +164,7 @@ func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 	application.InvokeAsync(func() {
 		// 先加载本地 loading 页（即时显示，无白屏）。
 		// Hash 仅供 loading.html 显示目标域名提示，实际跳转由 Go 端 SetURL 完成。
-		opts := newPopupOptions("Subs Check Pro", "/loading.html#"+capturedURL, windowSize)
+		opts := newPopupOptions("Subs Free", "/loading.html#"+capturedURL, windowSize)
 		popup := wailsApp.Window.NewWithOptions(opts)
 		popup.Show()
 		popup.Center()
@@ -623,7 +623,7 @@ func (g *GuiApp) OpenInternalPage(path string, title string, windowSize string) 
 	}
 
 	application.InvokeAsync(func() {
-		opts := newPopupOptions("Subs Check Pro — "+title, targetURL, windowSize)
+		opts := newPopupOptions("Subs Free — "+title, targetURL, windowSize)
 		opts.MinWidth = 600
 		opts.MinHeight = 640
 		opts.MaxWidth = 960
@@ -649,7 +649,7 @@ func (g *GuiApp) OpenAboutWindow() {
 		}
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:           "about",
-			Title:          "Subs Check Pro — 关于",
+			Title:          "Subs Free — 关于",
 			Width:          800,
 			Height:         600,
 			MinWidth:       640,
@@ -672,7 +672,7 @@ func (g *GuiApp) OpenAboutWindow() {
 // 供前端按钮和托盘菜单调用。
 func (g *GuiApp) CheckForUpdates() {
 	if g.updaterApp == nil {
-		sendOSNotification("Subs Check Pro", "更新检查暂不可用")
+		sendOSNotification("Subs Free", "更新检查暂不可用")
 		// 同时通知前端 toast，避免用户点击后毫无反馈
 		application.Get().Event.Emit("gui:update:toast", "更新检查暂不可用")
 		return
@@ -722,7 +722,7 @@ func (g *GuiApp) CheckForUpdates() {
 			g.updaterApp.Event.Emit("gui:update:toast", "已经是最新版")
 
 			// 发送系统通知
-			sendOSNotification("Subs Check Pro GUI", "已经是最新版")
+			sendOSNotification("Subs Free", "已经是最新版")
 			return
 		}
 
@@ -754,7 +754,7 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:          "updater",
-			Title:         "Subs Check Pro — 检查更新",
+			Title:         "Subs Free — 检查更新",
 			Width:         520,
 			Height:        540,
 			MinWidth:      348,
@@ -997,7 +997,7 @@ func (g *GuiApp) OpenFilesWindow() {
 			"/gui/enter?n=" + nonce + "&redirect=/files"
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:           "files",
-			Title:          "Subs Check Pro — 内置文件",
+			Title:          "Subs Free — 内置文件",
 			Width:          940,
 			Height:         640,
 			MinWidth:       800,
@@ -1039,7 +1039,7 @@ func (g *GuiApp) OpenAnalysisWindow() {
 			"/gui/enter?n=" + nonce + "&redirect=/analysis"
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:           "analysis",
-			Title:          "Subs Check Pro — 分析报告",
+			Title:          "Subs Free — 分析报告",
 			Width:          1200,
 			Height:         700,
 			MinWidth:       800,
@@ -1145,7 +1145,7 @@ func (g *GuiApp) OpenSubLinksWindow() {
 
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:           "sub-links",
-			Title:          "Subs Check Pro — 订阅链接",
+			Title:          "Subs Free — 订阅链接",
 			Width:          Width,
 			Height:         winHeight,
 			MinWidth:       MinWidth,

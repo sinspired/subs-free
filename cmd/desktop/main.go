@@ -38,7 +38,7 @@ func main() {
 
 	// TODO:处理右键菜单
 	wailsApp := application.New(application.Options{
-		Name:        "Subs Check Pro",
+		Name:        "Subs Free",
 		Description: "订阅检测桌面管理面板",
 		Services: []application.Service{
 			application.NewService(guiApp),
@@ -102,7 +102,7 @@ func main() {
 	// 登录窗，加载 wails3 前端资产
 	loginWin := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:          "login",
-		Title:         "Subs Check Pro",
+		Title:         "Subs Free",
 		Width:         560,
 		Height:        400,
 		MinWidth:      540,
@@ -132,7 +132,7 @@ func main() {
 	// WebUI 大窗（加载 admin 页面，初始隐藏）
 	webUIWin := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:          "webui",
-		Title:         "Subs Check Pro",
+		Title:         "Subs Free",
 		Width:         1100,
 		Height:        700,
 		MinWidth:      700,
@@ -172,7 +172,7 @@ func main() {
 		hideWindow(webUIWin)
 		e.Cancel()
 		sendOSNotification(
-			"Subs Check Pro 后台运行",
+			"Subs Free 后台运行",
 			"右键点击托盘图标，选择「立即退出」可关闭程序",
 		)
 	})
