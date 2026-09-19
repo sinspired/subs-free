@@ -501,7 +501,7 @@ jobs:
         uses: sinspired/multi-release-notify@v1
         with:
           summary: >-
-            跨平台现代GUI客户端，基于 [Subs Check PRO](https://github.com/sinspired/subs-check-pro) 内核，本地原生界面 + WebUI，可远程管理，后台运行，支持开机自启，Windows 小白可用。
+            桌面端+移动端图形界面，支持 `Android` `Windows` `Linux` `Mac`，高性能网络节点检测管理客户端
           release_notes: ${{ steps.release.outputs.notes }}
           email_url: ${{ secrets.EMAIL_APPRISE_URL }}
           telegram_url: ${{ secrets.TELEGRAM_APPRISE_URL }}
