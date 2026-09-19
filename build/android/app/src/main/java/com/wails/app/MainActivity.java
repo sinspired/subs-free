@@ -83,6 +83,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 触发 Android 系统为当前应用分配外部沙盒目录并打通权限
+        getExternalFilesDir(null);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
