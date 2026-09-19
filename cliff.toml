@@ -22,7 +22,7 @@ body = """
 
 ## 下载说明
 
-请选择正确的操作系统和架构：苹果 M 系列芯片设备请选择 `macOS/Apple Silicon`，Windows 安装版请选择 `Setup`，二进制直接选择 `EXE`
+请选择正确的操作系统和架构：Android 手机选择 `.apk` 文件，部分深受国产厂商荼毒的设备，请选择 `_liet_arm64-v8a.apk`；苹果 M 系列芯片设备请选择 `macOS/Apple Silicon`；Windows 安装版请选择 `Setup`，二进制直接选择 `EXE`
 
 ![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/sinspired/subs-free/{{ version }}/total?logo=github&label=当前版本下载次数&labelColor=black&color=red)
 
@@ -39,13 +39,18 @@ body = """
             <td>Android</td>
                 <td>
                     <a href="{{ base }}arm64-v8a.apk"><img
-                    src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android"></a><br>
-                    <a href="{{ base }}x64.apk"><imgsrc="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
+                    src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android"></a>
+                    <br>
+                    <a href="{{ base }}lite_arm64-v8a.apk"><img
+                    src="https://img.shields.io/badge/APK-ARMv8_Lite-96ed89.svg?logo=android"></a>
+                    <br>
+                    <a href="{{ base }}x64.apk"><img
+                    src="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
+
                 </td>
                 <td>
-                    <a href="{{ base }}lite_arm64-v8a.apk"><img
-                    src="https://img.shields.io/badge/APK-ARMv8_Lite-168039.svg?logo=android"></a><br>
-                    <a href="{{ base }}x64.apk"><imgsrc="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
+                    <a href="{{ base }}x64.apk"><img
+                    src="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
                 </td>
             </tr>
             <tr>
@@ -64,7 +69,9 @@ body = """
                     <a href="{{ base }}darwin_arm64.app.tar.gz"><img
                             src="https://img.shields.io/badge/App-Apple%20Silicon-%23000000.svg?logo=apple"></a><br>
                     <a href="{{ base }}darwin_x64.app.tar.gz"><img
-                            src="https://img.shields.io/badge/App-Intel%20X64-%2300A9E0.svg?logo=apple"></a><br>
+                            src="https://img.shields.io/badge/App-Intel%20X64-%2300A9E0.svg?logo=apple"></a>
+                    <br>
+                    <br>
                     <a href="{{ base }}darwin_arm64.dmg"><img
                             src="https://img.shields.io/badge/DMG-Apple%20Silicon-%23000000.svg?logo=apple"></a><br>
                     <a href="{{ base }}darwin_arm64.dmg"><img
@@ -77,7 +84,9 @@ body = """
                     <a href="{{ base }}linux_x64"><img
                             src="https://img.shields.io/badge/Binary-x64-f84e29.svg?logo=linux"></a><br>
                     <a href="{{ base }}linux_x64.deb"><img
-                            src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"></a><br>
+                            src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"></a>
+                    <br>
+                    <br>
                     <a href="{{ base }}linux_arm64"><img
                             src="https://img.shields.io/badge/Binary-arm64-96ed89.svg?logo=linux"></a><br>
                     <a href="{{ base }}linux_arm64.deb"><img
