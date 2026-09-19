@@ -213,7 +213,7 @@ jobs:
           mkdir -p dist
           case "${GOARCH}" in
             amd64) ARCH_NAME="x64" ;;
-            arm64) ARCH_NAME="arm64" ;;
+            arm64) ARCH_NAME="arm64-v8a" ;;
             *)     ARCH_NAME="${GOARCH}" ;;
           esac
 
@@ -227,7 +227,7 @@ jobs:
             exit 1
           fi
 
-          # 重命名策略：subs-free_arm64.apk 和 subs-free_lite_arm64.apk
+          # 重命名策略：subs-free_arm64-v8a.apk 和 subs-free_lite_arm64-v8.apk
           for apk in "${apks[@]}"; do
             base=$(basename "${apk}")
             if [[ "${base}" == *-lite.apk ]]; then

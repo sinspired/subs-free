@@ -1,0 +1,133 @@
+# git-cliff 配置文件
+# 放在项目根目录，orhun/git-cliff-action 会自动读取
+# 文档：https://git-cliff.org/docs/configuration
+
+[changelog]
+# changelog 头部（--strip header 参数会忽略此项）
+header = "# Changelog\n\n"
+# 每个 tag 的正文模板（Tera 模板语法）
+body = """
+## What's Changed
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
+{{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/sinspired/subs-free/commit/{{ commit.id }}))\
+{% endfor %}
+{% endfor %}\n
+
+{% if version %}
+{% set base = "https://github.com/sinspired/subs-free/releases/download/" ~ version ~ "/subs-free_" %}
+
+## 下载说明
+
+请选择正确的操作系统和架构：苹果 M 系列芯片设备请选择 `macOS/Apple Silicon`，Windows 安装版请选择 `Setup`，二进制直接选择 `EXE`
+
+![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/sinspired/subs-free/{{ version }}/total?logo=github&label=当前版本下载次数&labelColor=black&color=red)
+
+
+<div align=left>
+    <table>
+        <thead align=left>
+            <tr>
+                <th>OS</th>
+                <th>Download</th>
+            </tr>
+        </thead>
+        <tbody align=left>
+            <td>Android</td>
+                <td>
+                    <a href="{{ base }}arm64-v8a.apk"><img
+                    src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android"></a><br>
+                    <a href="{{ base }}x64.apk"><imgsrc="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
+                </td>
+                <td>
+                    <a href="{{ base }}lite_arm64-v8a.apk"><img
+                    src="https://img.shields.io/badge/APK-ARMv8_Lite-168039.svg?logo=android"></a><br>
+                    <a href="{{ base }}x64.apk"><imgsrc="https://img.shields.io/badge/APK-x64-96ed89.svg?logo=android"></a>
+                </td>
+            </tr>
+            <tr>
+                <td>Windows</td>
+                <td>
+                    <a href="{{ base }}windows_x64-setup.exe"><img
+                            src="https://custom-icon-badges.demolab.com/badge/Setup-x64-2d7d9a.svg?logo=windows11"></a>
+                    <br>
+                    <a href="{{ base }}windows_x64.exe"><img
+                            src="https://custom-icon-badges.demolab.com/badge/Exe-x64-2d7d9a.svg?logo=windows11"></a>
+                </td>
+            </tr>
+            <tr>
+                <td>macOS</td>
+                <td>
+                    <a href="{{ base }}darwin_arm64.app.tar.gz"><img
+                            src="https://img.shields.io/badge/App-Apple%20Silicon-%23000000.svg?logo=apple"></a><br>
+                    <a href="{{ base }}darwin_x64.app.tar.gz"><img
+                            src="https://img.shields.io/badge/App-Intel%20X64-%2300A9E0.svg?logo=apple"></a><br>
+                    <a href="{{ base }}darwin_arm64.dmg"><img
+                            src="https://img.shields.io/badge/DMG-Apple%20Silicon-%23000000.svg?logo=apple"></a><br>
+                    <a href="{{ base }}darwin_arm64.dmg"><img
+                            src="https://img.shields.io/badge/DMG-Intel%20X64-%2300A9E0.svg?logo=apple"></a>
+                </td><br>
+            </tr>
+            <tr>
+                <td>Linux</td>
+                <td>
+                    <a href="{{ base }}linux_x64"><img
+                            src="https://img.shields.io/badge/Binary-x64-f84e29.svg?logo=linux"></a><br>
+                    <a href="{{ base }}linux_x64.deb"><img
+                            src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"></a><br>
+                    <a href="{{ base }}linux_arm64"><img
+                            src="https://img.shields.io/badge/Binary-arm64-96ed89.svg?logo=linux"></a><br>
+                    <a href="{{ base }}linux_arm64.deb"><img
+                            src="https://img.shields.io/badge/DebPackage-arm64-45bf55.svg?logo=debian"></a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+"""
+
+# 底部
+footer = """
+"""
+# 去除首尾空白
+trim = true
+
+[git]
+# 是否要求提交符合 Conventional Commits 规范
+# false = 所有提交都会出现在 changelog，不做类型过滤
+conventional_commits = false
+# 是否过滤掉不符合规范的提交（配合 conventional_commits = true 使用）
+filter_unconventional = false
+# 提交消息预处理：去除 PR 合并信息噪音
+commit_preprocessors = [
+    { pattern = "Merge pull request #(\\d+) from \\S+", replace = "PR #$1" },
+    { pattern = "\\(#(\\d+)\\)", replace = "([#$1](https://github.com/sinspired/subs-free/pull/$1))" },
+]
+# 提交分组规则（根据提交消息前缀自动归类）
+commit_parsers = [
+    { message = "^feat", group = "✨ Features" },
+    { message = "^fix", group = "🐛 Bug Fixes" },
+    { message = "^perf", group = "⚡ Performance" },
+    { message = "^refactor", group = "♻️ Refactor" },
+    { message = "^doc", group = "📚 Documentation" },
+    { message = "^chore", group = "🔧 Chores" },
+    { message = "^ci", group = "👷 CI/CD" },
+    { message = "^build", group = "🏗️ Build" },
+    { message = "^test", group = "✅ Tests" },
+    { message = "^revert", group = "⏪ Reverts" },
+    # 不符合以上规则的提交归入"其他"
+    { message = ".*", group = "🔧 Chores" },
+]
+# 过滤掉纯版本 bump 提交（如 "chore: bump v2.5.6"）
+filter_commits = false
+# 按 tag 排序
+topo_order = false
+sort_commits = "newest"
+
+[remote.github]
+owner = "sinspired"
+repo = "subs-free"
