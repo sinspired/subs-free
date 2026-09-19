@@ -10,6 +10,23 @@ vars:
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
+
+
+  # 内核版本/commit：从 go.mod 解析，用 build/tools/verinfo 这个 Go 小工具实现，
+  # 不依赖 Python/Bash，只要能编译本项目就有 go 命令。
+  # 可用环境变量覆盖：CORE_VERSION=v2.5.4 CORE_COMMIT=7c23868 task build
+  CORE_VERSION:
+    sh: go run ./build/tools/verinfo core-version
+  CORE_COMMIT:
+    sh: go run ./build/tools/verinfo core-commit
+
+  # GUI 自身版本：取当前仓库 git tag
+  GUI_VERSION:
+    sh: git describe --tags --abbrev=0 2>/dev/null || echo "dev"
+
+env:
+  CGO_ENABLED: 1
+
 includes:
   # build/Taskfile.yml 里的通用任务（build:server、build:docker 等根级别便捷任务）
   # 默认按 desktop 处理——它们的 go build 已经显式指向 ./cmd/desktop，
@@ -28,10 +45,20 @@ tasks:
     summary: Builds the application
     cmds:
       - task: "{{.GOOS}}:build"
+        vars:
+          CORE_VERSION: "{{.CORE_VERSION}}"
+          CORE_COMMIT: "{{.CORE_COMMIT}}"
+          GUI_VERSION: "{{.GUI_VERSION}}"
+
   package:
     summary: Packages a production build of the application
     cmds:
       - task: "{{.GOOS}}:package"
+        vars:
+          CORE_VERSION: "{{.CORE_VERSION}}"
+          CORE_COMMIT: "{{.CORE_COMMIT}}"
+          GUI_VERSION: "{{.GUI_VERSION}}"
+
   run:
     summary: Runs the application
     cmds:
