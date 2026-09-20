@@ -8,6 +8,7 @@
 //	verinfo core-version                                   打印 go.mod 里内核依赖的版本号
 //	verinfo core-commit                                    打印内核依赖版本对应的 git commit 短哈希
 //	verinfo numeric <version>                              semver 转 4 段数字版本（用于 Windows 资源版本号）
+//	verinfo android-code <version>                         semver 转 Android versionCode（单个正整数）
 //	verinfo gen-syso <infoIn> <manifestIn> <infoOut> <manifestOut> <version>
 //	                                                        生成 syso 所需的 info.json / manifest 临时文件
 //
@@ -24,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -57,6 +59,11 @@ func main() {
 			die("numeric requires a version argument")
 		}
 		fmt.Println(toNumericVersion(os.Args[2]))
+	case "android-code":
+		if len(os.Args) < 3 {
+			die("android-code requires a version argument")
+		}
+		fmt.Println(toAndroidVersionCode(os.Args[2]))
 	case "gen-syso":
 		if len(os.Args) < 7 {
 			die("gen-syso requires: <infoIn> <manifestIn> <infoOut> <manifestOut> <version>")
@@ -203,6 +210,35 @@ func toNumericVersion(version string) string {
 		build = "0"
 	}
 	return fmt.Sprintf("%s.%s.%s.%s", m[1], m[2], m[3], build)
+}
+
+// ── android-code（semver → Android versionCode，单个正整数）────────────────
+
+// toAndroidVersionCode 把版本号转换成 Android 要求的单个正整数 versionCode
+// （Play Store 上限约 21 亿，且必须单调递增）。复用 toNumericVersion 解析出
+// 的 major.minor.patch.build 四段，按
+//
+//	code = major*1_000_000 + minor*10_000 + patch*100 + build
+//
+// 编码成一个整数。这套编码在当前版本号规模下（各段基本不会超过两位数）
+// 长期安全，且天然随语义化版本号单调递增；无法解析时兜底为 1，
+// 避免生成 0 或负数触发 Google Play/系统的校验失败。
+func toAndroidVersionCode(version string) string {
+	numeric := toNumericVersion(version) // "major.minor.patch.build"
+	parts := strings.Split(numeric, ".")
+	nums := make([]int, 4)
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			n = 0
+		}
+		nums[i] = n
+	}
+	code := nums[0]*1_000_000 + nums[1]*10_000 + nums[2]*100 + nums[3]
+	if code <= 0 {
+		code = 1
+	}
+	return strconv.Itoa(code)
 }
 
 // ── gen-syso（生成 Windows 版本资源 / manifest 临时文件）────────────────────

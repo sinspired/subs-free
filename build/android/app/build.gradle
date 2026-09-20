@@ -14,8 +14,15 @@ android {
         applicationId "com.sinspired.subs_free"
         minSdk 21
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        // versionCode/versionName 通过 Task 在调用 gradlew 时用
+        // -PappVersionCode=... -PappVersionName=... 传入（见
+        // build/android/Taskfile.yml 里的 assemble:* 任务），来源和
+        // 注入进 Go 二进制、界面上显示的版本号是同一个 GUI_VERSION，
+        // 保证 APK 元数据（系统/应用商店识别用）和界面显示的版本号
+        // 始终一致。这里的默认值只在直接用 Android Studio 打开、
+        // 没有走 Task 构建流程时兜底。
+        versionCode project.hasProperty('appVersionCode') ? (project.appVersionCode as Integer) : 1
+        versionName project.hasProperty('appVersionName') ? project.appVersionName : "1.0"
 
         // Configure supported ABIs
         ndk {

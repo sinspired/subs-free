@@ -1,24 +1,23 @@
 # build\android\Taskfile.yml
 version: '3'
+
 includes:
   common:
     taskfile: ../Taskfile.yml
     vars:
       APP_DIR: '../../cmd/mobile'
+
 vars:
   APP_ID: '{{.APP_ID | default "com.sinspired.subs_free"}}'
   MIN_SDK: '21'
   TARGET_SDK: '35'
   # The emulator runs the host architecture; physical devices are arm64
-
   HOST_ARCH:
     sh: '{{if eq .OS "windows"}}echo amd64{{else}}[ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64"{{end}}'
   # System-image ABI for the host, used in the "create an AVD" hint below.
-
   ANDROID_ABI:
     sh: '{{if eq .OS "windows"}}echo x86_64{{else}}[ "$(uname -m)" = "arm64" ] && echo "arm64-v8a" || echo "x86_64"{{end}}'
   # SDK location: $ANDROID_HOME / $ANDROID_SDK_ROOT, else the per-OS default
-
   # (macOS: ~/Library/Android/sdk, Linux/other: ~/Android/Sdk)
   SDK_ROOT:
     sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"'
@@ -27,7 +26,6 @@ vars:
   EMULATOR:
     sh: 'command -v emulator || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}/emulator/emulator"'
   # avdmanager lives under cmdline-tools/<version>/bin; used to auto-create an
-
   # AVD when none exists (mirrors the iOS `ensure-simulator` auto-create flow).
   AVDMANAGER:
     sh: 'command -v avdmanager || ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"/cmdline-tools/*/bin/avdmanager 2>/dev/null | sort -V | tail -1 || true'
@@ -37,6 +35,7 @@ vars:
     sh: 'go run ./build/tools/verinfo core-version'
   DEFAULT_CORE_COMMIT:
     sh: 'go run ./build/tools/verinfo core-commit'
+
 tasks:
   install:deps:
     summary: Check and install Android development dependencies
@@ -45,6 +44,7 @@ tasks:
     env:
       TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
     prompt: This will check and install Android development dependencies. Continue?
+
   build:
     summary: Creates a debug build of the application for Android
     deps:
@@ -66,7 +66,7 @@ tasks:
       - echo "Building Android app {{.OUT_NAME}} for {{.ARCH | default .HOST_ARCH}}..."
       - task: compile:go:shared
         vars:
-          ARCH: "{{.ARCH | default .HOST_ARCH}}"
+          ARCH: '{{.ARCH | default .HOST_ARCH}}'
           PRODUCTION:
             ref: .PRODUCTION
           CORE_VERSION:
@@ -78,6 +78,7 @@ tasks:
           LITE: '{{.LITE}}'
     env:
       PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
   compile:go:shared:
     summary: Compile Go code to shared library (.so)
     vars:
@@ -137,6 +138,7 @@ tasks:
 
         go build -buildmode=c-shared -overlay build/android/overlay.json {{.BUILD_FLAGS}} \
           -o build/android/app/src/main/jniLibs/$JNI_DIR/libwails.so ./cmd/mobile
+
   compile:go:all-archs:
     summary: Compile Go code for all Android architectures (fat APK)
     cmds:
@@ -146,6 +148,7 @@ tasks:
       - task: compile:go:shared
         vars:
           ARCH: amd64
+
   package:
     summary: Packages a production build of the application into a signed release APK
     desc: |
@@ -154,7 +157,7 @@ tasks:
     deps:
       - task: build
         vars:
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           ARCH: '{{.ARCH | default "arm64"}}'
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
@@ -164,12 +167,14 @@ tasks:
       - task: assemble:apk:release
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+
   package:fat:
     summary: Packages a production build for all architectures (fat APK)
     deps:
       - task: build
         vars:
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           ARCH: arm64
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
@@ -179,7 +184,7 @@ tasks:
       - task: compile:go:shared
         vars:
           ARCH: amd64
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
           CORE_COMMIT: '{{.CORE_COMMIT | default .DEFAULT_CORE_COMMIT}}'
@@ -187,6 +192,8 @@ tasks:
       - task: assemble:apk:release
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+
   bundle:
     summary: Packages a production AAB (Android App Bundle) for Play Store submission
     desc: |
@@ -195,7 +202,7 @@ tasks:
     deps:
       - task: build
         vars:
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           ARCH: '{{.ARCH | default "arm64"}}'
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
@@ -205,12 +212,14 @@ tasks:
       - task: assemble:aab:release
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+
   bundle:fat:
     summary: Packages a production AAB for all architectures
     deps:
       - task: build
         vars:
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           ARCH: arm64
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
@@ -220,7 +229,7 @@ tasks:
       - task: compile:go:shared
         vars:
           ARCH: amd64
-          PRODUCTION: "true"
+          PRODUCTION: 'true'
           LITE: '{{.LITE}}'
           CORE_VERSION: '{{.CORE_VERSION | default .DEFAULT_CORE_VERSION}}'
           CORE_COMMIT: '{{.CORE_COMMIT | default .DEFAULT_CORE_COMMIT}}'
@@ -228,18 +237,26 @@ tasks:
       - task: assemble:aab:release
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+
   assemble:apk:
     summary: Assembles a debug APK using Gradle
     vars:
       OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
+      # 和 build/compile:go:shared 用的是同一套 GUI_VERSION/CORE_VERSION
+      # 兜底逻辑，保证不管有没有被上层任务显式传入，这里算出来的版本号
+      # 都和注入进 Go 二进制、界面上显示的版本号一致。
+      GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+      APP_VERSION_CODE:
+        sh: 'go run ./build/tools/verinfo android-code "{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}"'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
-        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+        msg: 'Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME'
     cmds:
       - platforms: [windows]
         cmd: |
           cd build/android
-          cmd /c gradlew.bat assembleDebug
+          cmd /c gradlew.bat assembleDebug -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           powershell -Command "Copy-Item 'app\\build\\outputs\\apk\\debug\\app-debug.apk' '..\\..\\{{.BIN_DIR}}\\{{.OUT_NAME}}.apk'"
           powershell -Command "Write-Output 'APK created: {{.BIN_DIR}}\\{{.OUT_NAME}}.apk'"
       - platforms: [linux, darwin]
@@ -248,21 +265,25 @@ tasks:
           # The exec bit is lost when gradlew is extracted from the embedded
           # build assets, so restore it before invoking the wrapper.
           chmod +x ./gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           cp app/build/outputs/apk/debug/app-debug.apk "../../{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
           echo "APK created: {{.BIN_DIR}}/{{.OUT_NAME}}.apk"
+
   assemble:apk:release:
     summary: Assembles a release APK using Gradle (signed with the debug keystore unless ANDROID_KEYSTORE_FILE is set)
     vars:
       OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
+      GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+      APP_VERSION_CODE:
+        sh: 'go run ./build/tools/verinfo android-code "{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}"'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
-        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+        msg: 'Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME'
     cmds:
       - platforms: [windows]
         cmd: |
           cd build/android
-          cmd /c gradlew.bat assembleRelease -x lintVitalAnalyzeRelease
+          cmd /c gradlew.bat assembleRelease -x lintVitalAnalyzeRelease -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           powershell -Command "Copy-Item 'app\\build\\outputs\\apk\\release\\app-release.apk' '..\\..\\{{.BIN_DIR}}\\{{.OUT_NAME}}.apk'"
           powershell -Command "Write-Output 'Release APK created: {{.BIN_DIR}}\\{{.OUT_NAME}}.apk'"
       - platforms: [linux, darwin]
@@ -271,21 +292,25 @@ tasks:
           # The exec bit is lost when gradlew is extracted from the embedded
           # build assets, so restore it before invoking the wrapper.
           chmod +x ./gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           cp app/build/outputs/apk/release/app-release.apk "../../{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
           echo "Release APK created: {{.BIN_DIR}}/{{.OUT_NAME}}.apk"
+
   assemble:aab:
     summary: Assembles a debug AAB (Android App Bundle) using Gradle
     vars:
       OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
+      GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+      APP_VERSION_CODE:
+        sh: 'go run ./build/tools/verinfo android-code "{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}"'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
-        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+        msg: 'Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME'
     cmds:
       - platforms: [windows]
         cmd: |
           cd build/android
-          cmd /c gradlew.bat bundleDebug
+          cmd /c gradlew.bat bundleDebug -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           powershell -Command "Copy-Item 'app\\build\\outputs\\bundle\\debug\\app-debug.aab' '..\\..\\{{.BIN_DIR}}\\{{.OUT_NAME}}.aab'"
           powershell -Command "Write-Output 'AAB created: {{.BIN_DIR}}\\{{.OUT_NAME}}.aab'"
       - platforms: [linux, darwin]
@@ -294,21 +319,25 @@ tasks:
           # The exec bit is lost when gradlew is extracted from the embedded
           # build assets, so restore it before invoking the wrapper.
           chmod +x ./gradlew
-          ./gradlew bundleDebug
+          ./gradlew bundleDebug -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           cp app/build/outputs/bundle/debug/app-debug.aab "../../{{.BIN_DIR}}/{{.OUT_NAME}}.aab"
           echo "AAB created: {{.BIN_DIR}}/{{.OUT_NAME}}.aab"
+
   assemble:aab:release:
     summary: Assembles a release AAB for Play Store upload (signed with the debug keystore unless ANDROID_KEYSTORE_FILE is set)
     vars:
       OUT_NAME: '{{if eq (print .LITE) "true"}}{{.APP_NAME}}-lite{{else}}{{.APP_NAME}}{{end}}'
+      GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
+      APP_VERSION_CODE:
+        sh: 'go run ./build/tools/verinfo android-code "{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}"'
     preconditions:
       - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
-        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+        msg: 'Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME'
     cmds:
       - platforms: [windows]
         cmd: |
           cd build/android
-          cmd /c gradlew.bat bundleRelease
+          cmd /c gradlew.bat bundleRelease -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           powershell -Command "Copy-Item 'app\\build\\outputs\\bundle\\release\\app-release.aab' '..\\..\\{{.BIN_DIR}}\\{{.OUT_NAME}}.aab'"
           powershell -Command "Write-Output 'Release AAB created: {{.BIN_DIR}}\\{{.OUT_NAME}}.aab'"
       - platforms: [linux, darwin]
@@ -326,15 +355,17 @@ tasks:
           # The exec bit is lost when gradlew is extracted from the embedded
           # build assets, so restore it before invoking the wrapper.
           chmod +x ./gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease -PappVersionName={{.GUI_VERSION}} -PappVersionCode={{.APP_VERSION_CODE}}
           cp app/build/outputs/bundle/release/app-release.aab "../../{{.BIN_DIR}}/{{.OUT_NAME}}.aab"
           echo "Release AAB created: {{.BIN_DIR}}/{{.OUT_NAME}}.aab"
+
   generate:android:overlay:
     internal: true
     summary: Generate Go build overlay that registers the Android main
     # 改变当前任务的工作目录到真实的 Go 入口，欺骗 wails3 使其生成包含 cmd/mobile 路径的 key
 
     dir: '{{.ROOT_DIR}}/cmd/mobile'
+    method: none
     sources:
       # 因为切换了工作目录，原有的相对路径需要修改为基于 ROOT_DIR 的绝对路径
       - '{{.ROOT_DIR}}/build/config.yml'
@@ -347,7 +378,7 @@ tasks:
     internal: true
     summary: Generates bindings for Android
     sources:
-      - "**/*.go"
+      - '**/*.go'
       - go.mod
       - go.sum
     generates:
@@ -359,6 +390,7 @@ tasks:
     env:
       GOOS: android
       CGO_ENABLED: 0
+
   ensure-emulator:
     internal: true
     summary: Ensure Android Emulator is running
@@ -422,9 +454,10 @@ tasks:
         exit 1
     preconditions:
       - sh: '[ -x "{{.ADB}}" ] || command -v adb'
-        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+        msg: 'adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)'
       - sh: '[ -x "{{.EMULATOR}}" ] || command -v emulator'
-        msg: "emulator not found. Install the Android SDK emulator package (or set ANDROID_HOME)"
+        msg: 'emulator not found. Install the Android SDK emulator package (or set ANDROID_HOME)'
+
   deploy-emulator:
     summary: Deploy the packaged release APK to the Android Emulator
     deps:
@@ -439,6 +472,7 @@ tasks:
       - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
       - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"'
       - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
+
   run:
     summary: Build, install and launch a debug build in the Android Emulator
     deps:
@@ -452,13 +486,16 @@ tasks:
       - task: assemble:apk
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
       - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
       - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"'
       - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
+
   device:list:
     summary: Lists connected Android devices and emulators (serials)
     cmds:
       - '"{{.ADB}}" devices -l'
+
   run:device:
     summary: Build, install and launch a debug build on a connected physical Android device
     deps:
@@ -472,6 +509,7 @@ tasks:
       - task: assemble:apk
         vars:
           LITE: '{{.LITE}}'
+          GUI_VERSION: '{{.GUI_VERSION | default .DEFAULT_GUI_VERSION}}'
       - |
         DEVICE='{{.DEVICE_ID | default ""}}'
         if [ -z "$DEVICE" ]; then DEVICE="${DEVICE_ID:-}"; fi
@@ -489,7 +527,8 @@ tasks:
         "{{.ADB}}" -s "$DEVICE" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity
     preconditions:
       - sh: '[ -x "{{.ADB}}" ] || command -v adb'
-        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+        msg: 'adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)'
+
   deploy-device:
     summary: Deploy the packaged release APK to a connected physical Android device
     deps:
@@ -510,9 +549,11 @@ tasks:
         "{{.ADB}}" -s "$DEVICE" uninstall {{.APP_ID}} 2>/dev/null || true
         "{{.ADB}}" -s "$DEVICE" install "{{.BIN_DIR}}/{{.OUT_NAME}}.apk"
         "{{.ADB}}" -s "$DEVICE" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity
+
     preconditions:
       - sh: '[ -x "{{.ADB}}" ] || command -v adb'
-        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+        msg: 'adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)'
+
   studio:
     summary: Open the generated Android project in Android Studio
     cmds:
@@ -524,14 +565,17 @@ tasks:
           echo "then open the build/android directory."
           exit 1
         fi
+
   logs:
     summary: Stream Android logcat filtered to this app
     cmds:
       - '"{{.ADB}}" logcat -v time | grep -E "(Wails|{{.APP_NAME}})" || true'
+
   logs:all:
     summary: Stream all Android logcat (verbose)
     cmds:
       - '"{{.ADB}}" logcat -v time'
+
   clean:
     summary: Clean build artifacts
     cmds:
