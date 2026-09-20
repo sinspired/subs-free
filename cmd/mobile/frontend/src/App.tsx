@@ -419,18 +419,59 @@ export function App() {
 
   // 工具函数
   const copyText = async (text: string, name: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      showToast(`已复制 ${name}`, "success");
-    } catch {
-      const inp = document.createElement("input");
-      inp.value = text;
-      document.body.appendChild(inp);
-      inp.select();
-      document.execCommand("copy");
-      document.body.removeChild(inp);
-      showToast(`已复制 ${name}`, "success");
+    let success = false;
+
+    // 1. 首选：现代 Web API
+    // 优势：在现代手机上触发 OS 级别的原生剪贴板反馈（如 Android 13+ 屏幕左下角的气泡预览）
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(text);
+        success = true;
+      } catch (e) {
+        console.warn("现代 Clipboard API 失败，准备降级:", e);
+      }
     }
+
+    // 2. 兜底一：Wails 原生剪贴板 API
+    if (!success) {
+      try {
+        if (typeof (GuiApp as any).CopyToClipboard === 'function') {
+          success = await (GuiApp as any).CopyToClipboard(text);
+        }
+      } catch (e) {
+        console.warn("Wails 原生复制失败:", e);
+      }
+    }
+
+    // 3. 兜底二：传统 Web API（纯浏览器调试环境时的最终妥协）
+    if (!success) {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        // 绝对隐藏，防止拉起键盘或画面闪烁
+        textArea.style.position = "fixed";
+        textArea.style.top = "-9999px";
+        textArea.style.left = "-9999px";
+        textArea.style.opacity = "0";
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        success = document.execCommand("copy");
+        document.body.removeChild(textArea);
+      } catch (e) {
+        console.warn("传统 execCommand 彻底失败:", e);
+      }
+    }
+
+    // 统一 UI 反馈
+    if (success) {
+      showToast(`已复制 ${name}`, "success");
+    } else {
+      showToast(`复制失败，请尝试手动复制`, "error");
+    }
+
     setSheetSub(false);
     setSheetPath(false);
   };

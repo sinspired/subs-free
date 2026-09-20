@@ -343,3 +343,20 @@ func (g *GuiApp) MarkAPIKeyManual() {
 func (g *GuiApp) SetKeepAwake(enabled bool) {
 	application.Mobile.SetKeepAwake(enabled)
 }
+
+// CopyToClipboard 将文本写入系统剪贴板。
+// 作为前端 navigator.clipboard 失败时的强力原生兜底。
+func (g *GuiApp) CopyToClipboard(text string) bool {
+	// 优先使用全局实例调用 Wails v3 的剪贴板管理器
+	if globalApp != nil && globalApp.Clipboard != nil {
+		return globalApp.Clipboard.SetText(text)
+	}
+
+	// 兜底获取实例
+	app := application.Get()
+	if app != nil && app.Clipboard != nil {
+		return app.Clipboard.SetText(text)
+	}
+
+	return false
+}

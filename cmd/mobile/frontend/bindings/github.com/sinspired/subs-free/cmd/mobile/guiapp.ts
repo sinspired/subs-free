@@ -34,6 +34,14 @@ export function BackToHome(): $CancellablePromise<void> {
     return $Call.ByID(1826000275);
 }
 
+/**
+ * CopyToClipboard 将文本写入系统剪贴板。
+ * 作为前端 navigator.clipboard 失败时的强力原生兜底。
+ */
+export function CopyToClipboard(text: string): $CancellablePromise<boolean> {
+    return $Call.ByID(3613982208, text);
+}
+
 export function GetAppInfo(): $CancellablePromise<$models.AppInfo> {
     return $Call.ByID(1303911513);
 }
