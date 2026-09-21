@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	coreapp "github.com/sinspired/subs-check-pro/v3/app"
@@ -23,15 +22,24 @@ var (
 
 func main() {
 	// 获取真实的 Android 沙盒路径，防止退化到 /data/local/tmp
-	workDir := utils.GetExecutablePath()
-	tmpDir := filepath.Join(workDir, "tmp")
-	_ = os.MkdirAll(tmpDir, 0755)
+	workDir := utils.GetPrivateStorageDir()
 
 	_ = os.Setenv("HOME", workDir)
-	_ = os.Setenv("TMPDIR", tmpDir)
 	_ = os.Chdir(workDir)
 	_ = os.Setenv("START_FROM_GUI", "1")
 
+	// tmpDir := filepath.Join(workDir, "tmp")
+	// _ = os.MkdirAll(tmpDir, 0755)
+	// _ = os.Setenv("TMPDIR", tmpDir)
+
+	// 环境彻底就绪后，初始化日志文件
+	fileHandler, err := coreapp.InitLoggerFile()
+
+	if err != nil || fileHandler == nil {
+		slog.Info("日志初始化失败", "error", err)
+	}
+
+	// 启动内核...
 	core := coreapp.New(Version, Version+CurrentCommit, "")
 
 	isFirstRun := false
