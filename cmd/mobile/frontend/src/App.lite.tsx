@@ -9,7 +9,7 @@ interface AppInfo {
   listenPort: string;
   subStorePort: string;
   subStorePath: string;
-  singBoxOldVer: string;
+  singBoxExtraVer: string;
   singBoxLatestVer: string;
   keyIsRandom: boolean;
   isFirstRun: boolean;
@@ -895,8 +895,8 @@ export function App() {
               { title: "v2ray", url: "/download/sub?target=V2Ray", img: "/static/icon/v2ray.svg" },
               { title: "Mihomo", url: "/api/file/mihomo", img: "/static/icon/mihomo.svg" },
               { title: "Shadowrocket", url: "/download/sub?target=ShadowRocket", img: "/static/icon/shadowrocket.svg" },
-              { title: `singbox-${info?.singBoxOldVer}`, url: `/api/file/singbox-${info?.singBoxOldVer}`, img: "/static/icon/sing-box.svg" },
               { title: `singbox-${info?.singBoxLatestVer}`, url: `/api/file/singbox-${info?.singBoxLatestVer}`, img: "/static/icon/sing-box.svg" },
+              { title: `singbox-${info?.singBoxExtraVer}`, url: `/api/file/singbox-${info?.singBoxExtraVer}`, img: "/static/icon/sing-box.svg" },
             ].map(item => (
               <div class="list-item sub-copy" onClick={() => { copyText(getSubLink(item.url), item.title); }}>
                 {item.img ? <img src={item.img} class="link-icon" /> : item.icon}

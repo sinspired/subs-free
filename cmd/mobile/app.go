@@ -40,7 +40,7 @@ type AppInfo struct {
 	ListenPort       string `json:"listenPort"`
 	SubStorePort     string `json:"subStorePort"`
 	SubStorePath     string `json:"subStorePath"`
-	SingBoxOldVer    string `json:"singBoxOldVer"`
+	SingBoxExtraVer  string `json:"singBoxExtraVer"`
 	SingBoxLatestVer string `json:"singBoxLatestVer"`
 	KeyIsRandom      bool   `json:"keyIsRandom"`
 	IsFirstRun       bool   `json:"isFirstRun"`
@@ -89,7 +89,7 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 	subPath := "/" + strings.TrimPrefix(config.GlobalConfig.SubStorePath, "/")
 
 	singBoxLatestVer := config.GlobalConfig.SingboxLatest.Version
-	singBoxOldVer := config.GlobalConfig.SingboxOld.Version
+	singBoxExtraVer := config.GlobalConfig.SingboxExtra.Version
 
 	coreVer := Version
 
@@ -98,7 +98,7 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 		ListenPort:       port,
 		SubStorePort:     subPort,
 		SubStorePath:     subPath,
-		SingBoxOldVer:    singBoxOldVer,
+		SingBoxExtraVer:  singBoxExtraVer,
 		SingBoxLatestVer: singBoxLatestVer,
 		KeyIsRandom:      !g.keyManualOverride && os.Getenv("GUI_KEY_IS_RANDOM") == "1",
 		IsFirstRun:       g.isFirstRun,
@@ -382,11 +382,11 @@ func (g *GuiApp) Platform() string {
 
 // HapticFeedback 震动反馈
 func (g *GuiApp) HapticFeedback(hapticType string) {
-    // type 可选值: "impact", "notification", "selection"
-    if hapticType == "" {
-        hapticType = "impact" // 默认值兜底
-    }
-    application.Mobile.Haptic(hapticType)
+	// type 可选值: "impact", "notification", "selection"
+	if hapticType == "" {
+		hapticType = "impact" // 默认值兜底
+	}
+	application.Mobile.Haptic(hapticType)
 }
 
 // GetNetworkStatus 获取当前设备网络状态，返回 JSON (例如 {"connected":true,"type":"cellular"})

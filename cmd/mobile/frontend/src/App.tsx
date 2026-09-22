@@ -8,7 +8,7 @@ interface AppInfo {
   listenPort: string;
   subStorePort: string;
   subStorePath: string;
-  singBoxOldVer: string;
+  singBoxExtraVer: string;
   singBoxLatestVer: string;
   keyIsRandom: boolean;
   isFirstRun: boolean;
@@ -856,7 +856,7 @@ export function App() {
                 <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }} title="显示/隐藏">
                   {keyShown ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>}
                 </button>
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => {copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥"); }} title="复制">
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥"); }} title="复制">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                 </button>
               </div>
@@ -929,10 +929,10 @@ export function App() {
               { title: "v2ray", url: "/download/sub?target=V2Ray", img: "/static/icon/v2ray.svg" },
               { title: "Mihomo", url: "/api/file/mihomo", img: "/static/icon/mihomo.svg" },
               { title: "Shadowrocket", url: "/download/sub?target=ShadowRocket", img: "/static/icon/shadowrocket.svg" },
-              { title: `singbox-${info?.singBoxOldVer}`, url: `/api/file/singbox-${info?.singBoxOldVer}`, img: "/static/icon/sing-box.svg" },
               { title: `singbox-${info?.singBoxLatestVer}`, url: `/api/file/singbox-${info?.singBoxLatestVer}`, img: "/static/icon/sing-box.svg" },
+              { title: `singbox-${info?.singBoxExtraVer}`, url: `/api/file/singbox-${info?.singBoxExtraVer}`, img: "/static/icon/sing-box.svg" },
             ].map(item => (
-              <div class="list-item sub-copy" onClick={() => {copyText(getSubLink(item.url), item.title); }}>
+              <div class="list-item sub-copy" onClick={() => { copyText(getSubLink(item.url), item.title); }}>
                 {item.img ? <img src={item.img} class="link-icon" /> : item.icon}
                 <span class="link-text">{item.title}</span>
                 <button class="share-link-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={(e: any) => { e.stopPropagation(); triggerHaptic("selection"); GuiApp.ShareLink(item.title, getSubLink(item.url)); }} title="分享到其他应用">
@@ -950,7 +950,7 @@ export function App() {
           <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
-          <button class="btn-primary-long" onClick={() => {copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
+          <button class="btn-primary-long" onClick={() => { copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
             <span class="btn-text">复制路径</span>
           </button>
         </div>

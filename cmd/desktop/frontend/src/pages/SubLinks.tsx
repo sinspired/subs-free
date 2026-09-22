@@ -85,7 +85,7 @@ export function SubLinks() {
   const [linkCtx, setLinkCtx] = useState<{
     subStorePort: string;
     path: string;
-    oldVer: string;
+    extraVer: string;
     latestVer: string;
   } | null>(null);
 
@@ -102,16 +102,16 @@ export function SubLinks() {
 
   function buildLinks(
     host: string,
-    ctx: { subStorePort: string; path: string; oldVer: string; latestVer: string },
+    ctx: { subStorePort: string; path: string; extraVer: string; latestVer: string },
   ): SubLink[] {
     const subBase = `http://${host}:${ctx.subStorePort}`;
-    const { path, oldVer, latestVer } = ctx;
+    const { path, extraVer: extraVer, latestVer } = ctx;
     return [
       { key: 'common', label: '通用订阅', url: `${subBase}${path}/download/sub` },
       { key: 'v2ray', label: 'V2Ray 订阅', url: `${subBase}${path}/download/sub?target=V2Ray`, icon: '/v2ray.png' },
       { key: 'mihomo', label: 'Mihomo 订阅', url: `${subBase}${path}/api/file/mihomo`, icon: '/mihomo.png' },
-      { key: 'singbox-old', label: `singbox-${oldVer} 订阅`, url: `${subBase}${path}/api/file/singbox-${oldVer}`, icon: '/singbox.png' },
       { key: 'singbox-latest', label: `singbox-${latestVer} 订阅`, url: `${subBase}${path}/api/file/singbox-${latestVer}`, icon: '/singbox.png' },
+      { key: 'singbox-extra', label: `singbox-${extraVer} 订阅`, url: `${subBase}${path}/api/file/singbox-${extraVer}`, icon: '/singbox.png' },
       { key: 'shadowrocket', label: 'Shadowrocket 订阅', url: `${subBase}${path}/download/sub?target=ShadowRocket`, icon: '/shadowrocket.png' },
     ];
   }
@@ -153,7 +153,7 @@ export function SubLinks() {
       const ctx = {
         subStorePort: info.subStorePort,
         path,
-        oldVer: vData.old,
+        extraVer: vData.extra,
         latestVer: vData.latest,
       };
       setLinkCtx(ctx);

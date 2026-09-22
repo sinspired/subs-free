@@ -6,7 +6,7 @@ export interface AppInfo {
     "listenPort": string;
     "subStorePort": string;
     "subStorePath": string;
-    "singBoxOldVer": string;
+    "singBoxExtraVer": string;
     "singBoxLatestVer": string;
     "keyIsRandom": boolean;
     "isFirstRun": boolean;
