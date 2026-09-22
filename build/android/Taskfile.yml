@@ -132,6 +132,7 @@ tasks:
 
         export CGO_ENABLED=1
         export GOOS=android
+        export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
 
         mkdir -p {{.BIN_DIR}}
         mkdir -p build/android/app/src/main/jniLibs/$JNI_DIR
