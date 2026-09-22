@@ -19,3 +19,6 @@ build/android/.gradle/
 *.zip
 *.syso
 *.car
+.idea/
+build/android/local.properties
+build/android/gradle/gradle-daemon-jvm.properties

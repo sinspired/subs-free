@@ -13,7 +13,7 @@
   --border-glass: rgba(0, 0, 0, 0.01);
   --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.04);
   --code-bg: rgba(0, 0, 0, 0.04);
-  
+
   /* 高可读性毛玻璃 (极高不透明度，强虚化) */
   --glass-bg: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(255, 255, 255, 0.6);
@@ -40,7 +40,7 @@
   --border-glass: rgba(255, 255, 255, 0.01);
   --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.3);
   --code-bg: rgba(255, 255, 255, 0.06);
-  
+
   /* 深色模式下的高可读毛玻璃 */
   --glass-bg: rgba(28, 30, 35, 0.88);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -53,29 +53,33 @@
 }
 
 /* 全局重置 */
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; outline: none !important; }
 
 *:focus { outline: none !important; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background-color: var(--bg); color: var(--text-main); line-height: 1.5;
-  user-select: none; -webkit-user-select: none; overflow-x: hidden; overflow-y: hidden; 
+  user-select: none; -webkit-user-select: none; overflow-x: hidden; overflow-y: hidden;
   transition: background-color 0.3s ease;
 }
 
-.m-page { 
-  display: flex; 
-  flex: 1 0 auto; 
-  flex-direction: column; 
-  height: 100vh; 
-  height: 100lvh; 
-  overflow-y: hidden; 
-  /* 优先使用后端穿透下来的 --sa-xx，如果没有则回退使用原生的 env()，最后兜底用 0px 防止 calc 计算错误 */
-  padding: calc(var(--sa-top, env(safe-area-inset-top, 0px)) + 0px) 
-           calc(var(--sa-right, env(safe-area-inset-right, 0px)) + 12px) 
-           calc(var(--sa-bottom, env(safe-area-inset-bottom, 0px)) + 0px) 
-           calc(var(--sa-left, env(safe-area-inset-left, 0px)) + 12px); 
+body {
+  padding: 0 10px;
+}
+
+.m-page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  height: 100vh;
+  height: 100lvh;
+  overflow-y: auto;
+  /* Respect the iOS safe area (notch, home indicator) */
+  padding: env(safe-area-inset-top, 0px)
+           env(safe-area-inset-right, 0px)
+           env(safe-area-inset-bottom, 0px)
+           env(safe-area-inset-left, 0px);
 }
 
 .flex-center { justify-content: center; align-items: center; text-align: center; }
@@ -84,7 +88,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 /* ── 头部与主题按钮 ── */
 .m-header { display: flex; flex-direction: column; align-items: center; padding: 0px 0 20px; position: relative; }
 
-.theme-btn { position: absolute; right: -4px; top: -44px; border: none; background: transparent; color: var(--text-sub); border-radius: 50%; padding: 10px; transition: all 0.2s; }
+.theme-btn { position: absolute; right: -4px; border: none; background: transparent; color: var(--text-sub); border-radius: 50%; padding: 10px; transition: all 0.2s; }
 .theme-btn:active { background: var(--code-bg); transform: scale(0.95); }
 .theme-btn svg { width: 20px; height: 20px; }
 
@@ -253,10 +257,10 @@ img.link-icon {filter: invert(var(--invert));}
 }
 [data-theme="dark"] .toast { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
 
-.toast.show { 
+.toast.show {
   /* Toast 动画高度适配 */
-  transform: translate(-50%, calc(var(--sa-top, env(safe-area-inset-top, 0px)) + 0px)) scale(1); 
-  opacity: 1; 
+  transform: translate(-50%, env(safe-area-inset-top, 0px)) scale(1);
+  opacity: 1;
 }
 
 .toast::before { content: ''; display: block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -305,6 +309,65 @@ img.link-icon {filter: invert(var(--invert));}
 .aw-link-arrow { flex-shrink: 0; color: var(--text-sub); opacity: 0.3; transform: translate(-4px, 4px); transition: all 0.25s; }
 .aw-link-card:active .aw-link-arrow { opacity: 0.9; transform: translate(0, 0); color: var(--text-main); }
 .about-footer-copyright { text-align: center; margin-top: 24px; font-size: 10px; color: var(--text-sub); opacity: 0.5; letter-spacing: 0.5px; }
+
+/* ── 自定义确认弹窗 (Modal) ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: color-mix(in srgb, var(--bg) 60%, transparent); /* 毛玻璃环境底色 */
+  z-index: 1200; opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-overlay.active {
+  opacity: 1; pointer-events: auto;
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+.modal-content {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-glass);
+  border-radius: 28px; /* 更圆润的倒角 */
+  padding: 32px 24px 24px; /* 增加上部留白，营造呼吸感 */
+  width: 100%; max-width: 400px;
+  transform: scale(0.95) translateY(10px);
+  transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1); /* 更舒缓的动画 */
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+.modal-overlay.active .modal-content {
+  transform: scale(1) translateY(0);
+}
+
+/* 柔和的顶部图标 */
+.modal-icon {
+  width: 44px; height: 44px; border-radius: 22px;
+  margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;
+}
+.modal-icon svg { width: 20px; height: 20px; }
+.modal-icon-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning); }
+.modal-icon-danger { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+
+/* 文字排版 */
+.modal-title { font-size: 17px; font-weight: 600; color: var(--text-main); margin-bottom: 8px; letter-spacing: 0.3px; }
+.modal-desc { font-size: 13.5px; color: var(--text-sub); line-height: 1.6; margin-bottom: 28px; white-space: pre-wrap; opacity: 0.9; }
+
+/* 按钮组 */
+.modal-actions { display: flex; gap: 12px; }
+.btn-modal {
+  flex: 1; height: 46px; border-radius: 23px; font-size: 14.5px; font-weight: 500;
+  border: none; cursor: pointer; transition: all 0.25s ease;
+}
+.btn-modal:active { transform: scale(0.95); opacity: 0.8; }
+.btn-modal.cancel { background: var(--bg); color: var(--text-sub); } /* 极简的取消按钮 */
+.btn-modal.btn-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: #d97706; }
+.btn-modal.btn-danger { background: color-mix(in srgb, var(--danger) 12%, transparent); color: #dc2626; }
+
+/* 深色模式修正 */
+[data-theme="dark"] .modal-content { box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4); }
+[data-theme="dark"] .btn-modal.btn-warning { color: #fcd34d; }
+[data-theme="dark"] .btn-modal.btn-danger { color: #fca5a5; }
 
 @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; filter: drop-shadow(0 0 10px rgba(14,165,160,0.2)); } 100% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 20px rgba(14,165,160,0.5)); } }
 @keyframes spin { 100% { transform: rotate(360deg); } }

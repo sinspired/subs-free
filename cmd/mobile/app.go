@@ -360,3 +360,43 @@ func (g *GuiApp) CopyToClipboard(text string) bool {
 
 	return false
 }
+
+// Platform 返回所属平台
+func (g *GuiApp) Platform() string {
+	sys := application.System
+	switch {
+	case sys.IsPlatform(application.PlatformIOS):
+		return "ios"
+	case sys.IsPlatform(application.PlatformAndroid):
+		return "android"
+	case sys.IsPlatform(application.PlatformMacOS):
+		return "macos"
+	case sys.IsPlatform(application.PlatformWindows):
+		return "windows"
+	case sys.IsPlatform(application.PlatformLinux):
+		return "linux"
+	default:
+		return "unknown"
+	}
+}
+
+// HapticFeedback 震动反馈
+func (g *GuiApp) HapticFeedback(hapticType string) {
+    // type 可选值: "impact", "notification", "selection"
+    if hapticType == "" {
+        hapticType = "impact" // 默认值兜底
+    }
+    application.Mobile.Haptic(hapticType)
+}
+
+// GetNetworkStatus 获取当前设备网络状态，返回 JSON (例如 {"connected":true,"type":"cellular"})
+func (g *GuiApp) GetNetworkStatus() string {
+	// "cellular", "wifi", "ethernet"
+	return application.Mobile.NetworkJSON()
+}
+
+// GetPowerStatus 获取当前设备电量状态，返回 JSON (例如 {"level":0.15,"charging":false,"lowPower":true})
+// state as {"level":0-1,"charging":bool,"lowPower":bool}. */
+func (g *GuiApp) GetPowerStatus() string {
+	return application.Mobile.PowerJSON()
+}

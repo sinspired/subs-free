@@ -50,12 +50,34 @@ export function GetCheckState(): $CancellablePromise<$models.CheckState> {
     return $Call.ByID(3279137383);
 }
 
+/**
+ * GetNetworkStatus 获取当前设备网络状态，返回 JSON (例如 {"connected":true,"type":"cellular"})
+ */
+export function GetNetworkStatus(): $CancellablePromise<string> {
+    return $Call.ByID(1069548834);
+}
+
+/**
+ * GetPowerStatus 获取当前设备电量状态，返回 JSON (例如 {"level":0.15,"charging":false,"lowPower":true})
+ * state as {"level":0-1,"charging":bool,"lowPower":bool}. * /
+ */
+export function GetPowerStatus(): $CancellablePromise<string> {
+    return $Call.ByID(507430917);
+}
+
 export function GetPublicInfo(): $CancellablePromise<$models.PublicInfo> {
     return $Call.ByID(2318748255);
 }
 
 export function GetSafeArea(): $CancellablePromise<$models.SafeArea> {
     return $Call.ByID(4144788850);
+}
+
+/**
+ * HapticFeedback 震动反馈
+ */
+export function HapticFeedback(hapticType: string): $CancellablePromise<void> {
+    return $Call.ByID(2383052482, hapticType);
 }
 
 /**
@@ -73,6 +95,13 @@ export function MarkAPIKeyManual(): $CancellablePromise<void> {
  */
 export function OpenInBrowser(url: string): $CancellablePromise<void> {
     return $Call.ByID(3639668739, url);
+}
+
+/**
+ * Platform 返回所属平台
+ */
+export function Platform(): $CancellablePromise<string> {
+    return $Call.ByID(1851100933);
 }
 
 /**

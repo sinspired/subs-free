@@ -1,4 +1,4 @@
-import { h, Fragment } from "preact";
+import { Fragment } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GuiApp } from "../bindings/github.com/sinspired/subs-free/cmd/mobile";
 
@@ -77,6 +77,61 @@ export function App() {
   const pathRef = useRef<HTMLSpanElement>(null);
   const initTimerRef = useRef<number>();
 
+  // 通用震动反馈函数
+  const triggerHaptic = useCallback((type: "selection" | "impact" | "notification" = "selection") => {
+    try {
+      if (typeof (GuiApp as any).HapticFeedback === "function") {
+        (GuiApp as any).HapticFeedback(type);
+      }
+    } catch (e) {
+      console.warn("震动反馈调用失败", e);
+    }
+  }, []);
+
+  // 弹窗状态管理（支持 JSX 内容与自动倒计时）
+  const [countdown, setCountdown] = useState(0);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    visible: boolean; title: string; content: any; type: "warning" | "danger"; autoConfirm: boolean;
+    onConfirm: () => void; onCancel: () => void;
+  }>({ visible: false, title: "", content: "", type: "warning", autoConfirm: false, onConfirm: () => { }, onCancel: () => { } });
+
+  // 弹窗倒计时处理 Hook
+  useEffect(() => {
+    let timer: number;
+    if (confirmDialog.visible && confirmDialog.autoConfirm) {
+      if (countdown > 0) {
+        timer = window.setTimeout(() => setCountdown(c => c - 1), 1000);
+      } else {
+        // 倒计时结束，静默触发确认
+        confirmDialog.onConfirm();
+      }
+    }
+    return () => window.clearTimeout(timer);
+  }, [confirmDialog.visible, confirmDialog.autoConfirm, countdown]);
+
+  // 封装 Promise 风格自定义确认弹窗
+  const requestConfirm = (title: string, content: any, type: "warning" | "danger" = "warning", autoConfirmSeconds: number = 0): Promise<boolean> => {
+    triggerHaptic("notification");
+    return new Promise((resolve) => {
+      if (autoConfirmSeconds > 0) setCountdown(autoConfirmSeconds);
+      setConfirmDialog({
+        visible: true, title, content, type, autoConfirm: autoConfirmSeconds > 0,
+        onConfirm: () => {
+          setConfirmDialog(prev => ({ ...prev, visible: false }));
+          setCountdown(0);
+          triggerHaptic("impact");
+          resolve(true);
+        },
+        onCancel: () => {
+          setConfirmDialog(prev => ({ ...prev, visible: false }));
+          setCountdown(0);
+          triggerHaptic("selection");
+          resolve(false);
+        }
+      });
+    });
+  };
+
   // 初始化与主题
   useEffect(() => {
     const saved = localStorage.getItem("scp-theme") as "light" | "dark" | null;
@@ -124,6 +179,7 @@ export function App() {
   }, []);
 
   const toggleTheme = () => {
+    triggerHaptic("selection");
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
@@ -134,6 +190,10 @@ export function App() {
 
   const showToast = (msg: string, type: "info" | "success" | "error" = "info") => {
     setToast({ msg, type, visible: true });
+    // 当出现 失败 弹窗时，自动触发 Notification 级别震动
+    if (type === "success" || type === "error") {
+      triggerHaptic("notification");
+    }
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 2000);
   };
 
@@ -239,6 +299,7 @@ export function App() {
           // 会先展示 status.lastResult 兜底文本，等新请求成功后才跳成统计卡片）。
           setFinalizing(true);
           fetchLastCheckStats().finally(() => setFinalizing(false));
+          triggerHaptic("notification")
         }
         return newStatus;
       });
@@ -280,7 +341,7 @@ export function App() {
     if (total && available) {
       setLastStats({
         time: time || "-",
-        duration: duration ? (parseInt(duration) >= 60 ? `${Math.floor(parseInt(duration) / 60)}分` : `${duration}秒`) : "0秒",
+        duration: duration ? (parseInt(duration) >= 60 ? `${Math.floor(parseInt(duration) / 60)} 分` : `${duration} 秒`) : "0 秒",
         total: parseInt(total) >= 10000 ? (parseInt(total) / 10000).toFixed(1) + "万" : total,
         available: available,
         traffic: traffic || "-",
@@ -288,9 +349,78 @@ export function App() {
     }
   };
 
+  // 检测启动逻辑：预检测网络与电量拦截（高鲁棒性 + 极简陈述 + 高亮数值）
   const toggleCheck = async () => {
     if (actionInFlight) return;
+    triggerHaptic("impact");
+
     setActionInFlight(true);
+    let shouldContinue = true;
+
+    if (!status?.isChecking) {
+      try {
+        const withTimeout = (promise: Promise<any>, ms: number) =>
+          Promise.race([
+            promise,
+            new Promise((_, rej) => setTimeout(() => rej(new Error("Native call timeout")), ms))
+          ]);
+
+        let isCellular = false;
+        let isLowBattery = false;
+        let currentBattery = 0;
+
+        const [netRes, pwrRes] = await Promise.allSettled([
+          typeof (GuiApp as any).GetNetworkStatus === 'function' ? withTimeout((GuiApp as any).GetNetworkStatus(), 1500) : Promise.resolve(null),
+          typeof (GuiApp as any).GetPowerStatus === 'function' ? withTimeout((GuiApp as any).GetPowerStatus(), 1500) : Promise.resolve(null)
+        ]);
+
+        if (netRes.status === 'fulfilled' && netRes.value) {
+          const net = JSON.parse(netRes.value);
+          isCellular = (net.type === 'cellular');
+        }
+
+        if (pwrRes.status === 'fulfilled' && pwrRes.value) {
+          const pwr = JSON.parse(pwrRes.value);
+          currentBattery = Math.round(pwr.level > 1 ? pwr.level : pwr.level * 100);
+          isLowBattery = !pwr.charging && (pwr.lowPower || currentBattery <= 20);
+        }
+
+        if (isCellular || isLowBattery) {
+          let title = "";
+          let content: any = null;
+          let alertType: "warning" | "danger" = (isCellular && isLowBattery) ? "danger" : "warning";
+
+          // 动态高亮电量数值，颜色跟随当前警告级别 (--warning 或 --danger)
+          const batterySpan = (
+            <span style={{ color: `var(--${alertType})`, fontWeight: 700, fontFamily: "monospace", fontSize: "14px", margin: "0 2px" }}>
+              {currentBattery}%
+            </span>
+          );
+
+          if (isCellular && isLowBattery) {
+            title = "环境提醒";
+            content = <Fragment>当前处于移动网络，且设备电量偏低 ({batterySpan})。<br />持续检测会消耗流量，并有设备关机风险。</Fragment>;
+          } else if (isCellular) {
+            title = "网络提醒";
+            content = <Fragment>当前处于移动网络。<br />执行检测将消耗部分数据流量。</Fragment>;
+          } else {
+            title = "电量提醒";
+            content = <Fragment>当前设备电量偏低 ({batterySpan})。<br />耗时的检测可能会导致设备耗尽电量。</Fragment>;
+          }
+
+          // 将之前隐藏的 8 秒倒计时逻辑显式传递进弹窗
+          shouldContinue = await requestConfirm(title, content, alertType, 8);
+        }
+      } catch (e) {
+        shouldContinue = true;
+      }
+    }
+
+    if (!shouldContinue) {
+      setActionInFlight(false);
+      return;
+    }
+
     try {
       if (status?.isChecking) {
         showToast("正在发送停止指令...", "info");
@@ -407,6 +537,7 @@ export function App() {
   };
 
   const onKeyEditIconClick = () => {
+    triggerHaptic("selection");
     if (!editingKey) return startEditKey();
     if (keyChanged) return saveApiKey();
     cancelEditKey();
@@ -500,7 +631,7 @@ export function App() {
     return `http://127.0.0.1:${cleanPort}${basePath}${cleanPath}`;
   };
 
-  // 路径中段省略逻辑
+  // 路径中段截断省略逻辑
   const infoRef = useRef<AppInfo | null>(null);
   infoRef.current = info;
 
@@ -702,7 +833,7 @@ export function App() {
                     onBlur={() => { cancelEditKey(); }}
                   />
                 ) : (
-                  <span class={`key-text ${keyShown ? "" : "blur"}`} onClick={() => setKeyShown(!keyShown)}>{info?.apiKey}</span>
+                  <span class={`key-text ${keyShown ? "" : "blur"}`} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }}>{info?.apiKey}</span>
                 )}
 
                 {/* 三个按钮位置始终固定；只有编辑/保存这一个按钮的图标随编辑状态变化 */}
@@ -722,10 +853,10 @@ export function App() {
                   )}
                 </button>
 
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => setKeyShown(!keyShown)} title="显示/隐藏">
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }} title="显示/隐藏">
                   {keyShown ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>}
                 </button>
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥")} title="复制">
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { triggerHaptic("selection"); copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥"); }} title="复制">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                 </button>
               </div>
@@ -749,21 +880,21 @@ export function App() {
 
       <footer class="m-footer">
         <div class="quick-actions">
-          <button class="btn-quick" onClick={() => GuiApp.OpenInBrowser(`http://127.0.0.1:${info?.listenPort}`)} title="在系统浏览器中打开管理面板">
+          <button class="btn-quick" onClick={() => { triggerHaptic("notification"); GuiApp.OpenInBrowser(`http://127.0.0.1:${info?.listenPort}`); }} title="在系统浏览器中打开管理面板">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
           </button>
-          <button class="btn-quick" onClick={() => window.location.href = "/analysis.html"} title="分析报告">
+          <button class="btn-quick" onClick={() => { triggerHaptic("selection"); window.location.href = "/analysis.html"; }} title="分析报告">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>
           </button>
-          <button class="btn-quick" onClick={() => window.location.href = "/files.html"} title="内置文件">
+          <button class="btn-quick" onClick={() => { triggerHaptic("selection"); window.location.href = "/files.html"; }} title="内置文件">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
           </button>
           {info?.subStorePort && (
             <Fragment>
-              <button class="btn-quick" onClick={() => window.location.href = buildSubStoreUrl().url} title="订阅管理">
+              <button class="btn-quick" onClick={() => { triggerHaptic("selection"); window.location.href = buildSubStoreUrl().url; }} title="订阅管理">
                 <svg viewBox="0 0 108 108" fill="currentColor"><path d="M12.6 35C8.2 21.8 21 8.5 34.3 12.5c3.4 1 8.2 4.9 15.2 11.8l10.2 10.3-2.8 2.8-2.8 2.8-10-9.9c-8.2-8.2-10.7-9.9-14.2-9.9-9.2 0-12.5 10.6-5.4 17.4l3.8 3.8-2.8 3-2.8 3-4.2-4.1c-2.3-2.2-4.9-6-5.6-8.4h-.2z" /><path d="M48.1 46.5l-7.4 7.6 3.8 3.8 3.8 3.8-2.8 2.8-2.8 3-6.7-6.8-6.8-6.7 6.4-6.4c3.4-3.4 6.7-6.4 7.2-6.4s2 1.8 5.6 5.2zM59.7 46.5l7.4 7.6-3.8 3.8-3.8 3.8 2.8 2.8 2.8 3 6.7-6.8 6.8-6.7-6.4-6.4c-3.4-3.4-6.7-6.4-7.2-6.4s-2 1.8-5.6 5.2zM24.4 70.4c-4.5 5.2-5 10.8-1.3 14.6 4 4 10.3 3.4 14.8-1.3l3.8-3.8 3 2.8 3 2.8-4.1 4.2c-8 8.2-18.4 8.8-26 1-7.7-7.6-7.4-17.5.9-26l4-4.2 3 2.8 2.8 2.7-3.8 4.4zM83.6 37.6c4.5-5.2 5-10.8 1.3-14.6-4-4-10.3-3.4-14.8 1.3l-3.8 3.8-3-2.8-3-2.8 4.1-4.2c8-8.2 18.4-8.8 26-1 7.7 7.6 7.4 17.5-.9 26l-4 4.2-3-2.8-2.8-2.7 3.8-4.4z" /><path d="M95.4 73c4.4 13.3-8.4 26.5-21.6 22.5-3.4-1-8.2-4.9-15.2-11.8L48.4 73.4l2.8-2.8 2.8-2.8 10 9.9c8.2 8.2 10.7 9.9 14.2 9.9 9.2 0 12.5-10.6 5.4-17.4l-3.8-3.8 2.8-3 2.8-3 4.2 4.1c2.3 2.2 4.9 6 5.6 8.4z" /></svg>
               </button>
-              <button class="btn-quick" onClick={() => setSheetSub(true)} title="订阅分享">
+              <button class="btn-quick" onClick={() => { triggerHaptic("selection"); setSheetSub(true); }} title="订阅分享">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
               </button>
             </Fragment>
@@ -775,12 +906,12 @@ export function App() {
             {isChecking ? <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg> : <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>}
           </button>
 
-          <button class="btn-primary-long" onClick={() => window.location.href = "/admin.html"}>
+          <button class="btn-primary-long" onClick={() => { triggerHaptic("selection"); window.location.href = "/admin.html"; }}>
             <span class="btn-text">管理面板</span>
           </button>
 
           {/* 右侧：关于按钮*/}
-          <button class="action-fab-small btn-about" onClick={() => setSheetAbout(true)}>
+          <button class="action-fab-small btn-about" onClick={() => { triggerHaptic("selection"); setSheetAbout(true); }}>
             <svg viewBox="0 0 1024 1024" width="24" height="24"><path d="M858.026667 307.2H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466666c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466666c0 12.373333-9.813333 22.186667-22.186666 22.186667zM858.026667 546.133333H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186666v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186666zM858.026667 785.066667H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186666h672c12.373333 0 22.186667 9.813333 22.186666 22.186666v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186667z" fill="currentColor"></path></svg>
           </button>
         </div>
@@ -801,10 +932,10 @@ export function App() {
               { title: `singbox-${info?.singBoxOldVer}`, url: `/api/file/singbox-${info?.singBoxOldVer}`, img: "/static/icon/sing-box.svg" },
               { title: `singbox-${info?.singBoxLatestVer}`, url: `/api/file/singbox-${info?.singBoxLatestVer}`, img: "/static/icon/sing-box.svg" },
             ].map(item => (
-              <div class="list-item sub-copy" onClick={() => copyText(getSubLink(item.url), item.title)}>
+              <div class="list-item sub-copy" onClick={() => { triggerHaptic("selection"); copyText(getSubLink(item.url), item.title); }}>
                 {item.img ? <img src={item.img} class="link-icon" /> : item.icon}
                 <span class="link-text">{item.title}</span>
-                <button class="share-link-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={(e: any) => { e.stopPropagation(); GuiApp.ShareLink(item.title, getSubLink(item.url)); }} title="分享到其他应用">
+                <button class="share-link-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={(e: any) => { e.stopPropagation(); triggerHaptic("selection"); GuiApp.ShareLink(item.title, getSubLink(item.url)); }} title="分享到其他应用">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                 </button>
                 <svg class="link-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -819,7 +950,7 @@ export function App() {
           <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
-          <button class="btn-primary-long" onClick={() => copyText(info!.configPath, "配置文件路径")} style={{ width: '100%', marginTop: '16px' }}>
+          <button class="btn-primary-long" onClick={() => { triggerHaptic("selection"); copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
             <span class="btn-text">复制路径</span>
           </button>
         </div>
@@ -840,7 +971,7 @@ export function App() {
           </div>
 
           <div class="about-links-grid">
-            <div class="aw-link-card aw-featured" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro")}>
+            <div class="aw-link-card aw-featured" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
               <div class="aw-link-icon-wrap aw-featured-icon">
                 <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -854,7 +985,7 @@ export function App() {
                 <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free"); }}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
@@ -868,7 +999,7 @@ export function App() {
                 <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro")}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro"); }}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
@@ -885,6 +1016,30 @@ export function App() {
           </div>
           <div class="about-footer-copyright">
             © 2026 Sinspired · GPL-3.0 License
+          </div>
+        </div>
+      </div>
+
+      {/* 自定义确认弹窗 DOM */}
+      <div class={`modal-overlay ${confirmDialog.visible ? "active" : ""}`} onClick={confirmDialog.onCancel}>
+        <div class="modal-content" onClick={e => e.stopPropagation()}>
+          <div class={`modal-icon modal-icon-${confirmDialog.type}`}>
+            {confirmDialog.type === "danger" ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            )}
+          </div>
+          <h3 class="modal-title">{confirmDialog.title}</h3>
+          <div class="modal-desc">{confirmDialog.content}</div>
+          <div class="modal-actions">
+            <button class="btn-modal cancel" onClick={confirmDialog.onCancel}>取消</button>
+
+            {/* 👇 增加倒计时的展示 👇 */}
+            <button class={`btn-modal confirm btn-${confirmDialog.type}`} onClick={confirmDialog.onConfirm}>
+              继续 {confirmDialog.autoConfirm && countdown > 0 ? `(${countdown}s)` : ""}
+            </button>
+
           </div>
         </div>
       </div>
