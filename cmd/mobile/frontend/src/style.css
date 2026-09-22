@@ -60,7 +60,7 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background-color: var(--bg); color: var(--text-main); line-height: 1.5;
-  user-select: none; -webkit-user-select: none; overflow-x: hidden; overflow-y: hidden;
+  user-select: none; -webkit-user-select: none; overflow-x: hidden; overflow-y: auto;
   transition: background-color 0.3s ease;
 }
 
@@ -76,10 +76,10 @@ body {
   height: 100lvh;
   overflow-y: auto;
   /* Respect the iOS safe area (notch, home indicator) */
-  padding: env(safe-area-inset-top, 0px)
-           env(safe-area-inset-right, 0px)
-           env(safe-area-inset-bottom, 0px)
-           env(safe-area-inset-left, 0px);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .flex-center { justify-content: center; align-items: center; text-align: center; }
@@ -106,7 +106,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .ver-dot { font-size: 9px; color: var(--border); line-height: 1; user-select: none; }
 
 /* ── 内容区与卡片 ── */
-.m-content { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.m-content { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .card { background: var(--card); border-radius: 24px; padding: 20px; box-shadow: var(--shadow-card); border: 1px solid var(--border); transition: background-color 0.3s, border-color 0.3s; }
 
 /* 单独强化状态卡片的质感 */
@@ -148,13 +148,13 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 
 @keyframes pulse-success { 0% { opacity: 0.7; text-shadow: 0 0 0 transparent; } 100% { opacity: 1; text-shadow: 0 0 10px color-mix(in srgb, var(--success) 60%, transparent); } }
 
-.stats-grid { display: flex; gap: 8px; margin-bottom: 12px; }
+.stats-grid { display: flex; gap: 4px; margin-bottom: 12px; }
 .stat-item { flex: 1; background: color-mix(in srgb, var(--code-bg) 60%, transparent); border-radius: 12px; padding: 10px 2px; text-align: center; }
 .stat-item .val { display: block; font-size: 12px; font-family: monospace; font-weight: 600; color: var(--text-main); margin-bottom: 2px; }
 .stat-item .lbl { display: block; font-size: 10px; color: var(--text-sub); }
 
 .info-card { display: flex; flex-direction: column; padding-bottom: 16px; }
-.info-groups-wrapper { display: flex; flex-direction: column; gap: 20px; }
+.info-groups-wrapper { display: flex; flex-direction: column; gap: 16px; }
 .info-group { display: flex; flex-direction: column; gap: 8px; }
 
 .key-wrap { display: flex; align-items: center; gap: 5px; background: color-mix(in srgb, var(--code-bg) 60%, transparent); border: 1px solid var(--border-glass); border-radius: 14px; padding: 4px 4px 4px 14px; width: 100%; transition: background-color 0.3s; }
