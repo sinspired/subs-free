@@ -2,10 +2,10 @@
 
 # Subs Free
 
-基于 [Wails v3](https://v3.wails.io/) 构建，为 [subs-check-pro](https://github.com/sinspired/subs-check-pro) 提供的跨平台客户端程序，支持 `Android 手机应用`，支持`Windws` `Linux` `Mac`。
+基于 [Wails v3](https://v3.wails.io/) 构建，为 [subs-check-pro](https://github.com/sinspired/subs-check-pro) 提供的跨平台客户端程序，支持 `Android 手机` 和  `Windws`、`Linux`、`Mac`。
 
 [![Go](https://img.shields.io/github/go-mod/go-version/sinspired/subs-free)](https://go.dev/)
-[![Wails](https://img.shields.io/badge/Wails-v3.0.0--alpha-red?logo=wails)](https://v3.wails.io/)
+[![Wails](https://img.shields.io/badge/Wails-v3-red?logo=wails)](https://v3.wails.io/)
 [![License: GPL v3](https://img.shields.io/github/license/sinspired/subs-free)](./LICENCE)
 
 </div>
@@ -16,11 +16,11 @@
 
 ![preview](./doc/GUI.png)
 
-### 📱 移动端
+### 📱 移动端（目前仅支持 Android 手机）
 
-> 深受国产厂商荼毒的设备，请使用 `Lite` 版
+> 深受国产厂商荼毒的旧设备，请使用 `Lite` 版
 
-| Android 完整版                               | Android 精简版                                         |
+| 正常版                                       | Lite 版                                                |
 | -------------------------------------------- | ------------------------------------------------------ |
 | <img src="./doc/Android.png" alt="Android"/> | <img src="./doc/Android_Lite.png" alt="Android_Lite"/> |
 
@@ -41,7 +41,7 @@
 | Go                | ≥ 1.26 |                                                             |
 | Node.js           | ≥ 20   |                                                             |
 | pnpm / npm / yarn | 任意   | 前端包管理器                                                |
-| Wails CLI v3      | alpha  | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
+| Wails CLI v3      | beta  | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
 | Docker            | 可选   | 跨平台编译时需要                                            |
 
 ### Windows 额外依赖
@@ -156,7 +156,7 @@ wails3 task linux:build ARCH=arm64
 | ------------- | ------------------------------------------------------------- |
 | Linux / macOS | `~/.config/subs-check-pro/config.yaml`                        |
 | Windows       | `%APPDATA%\subs-check-pro\config.yaml`                        |
-| Android       | `/data/data/com.sinspired.subs_free/files/config/config.yaml` |
+| Android       | `/data/user/0/com.sinspired.subs_free/files/config/config.yaml` |
 
 关键配置项：
 
