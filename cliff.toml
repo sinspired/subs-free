@@ -36,24 +36,18 @@ body = """
       </tr>
     </thead>
     <tbody align="left">
-
       <!-- Android -->
       <tr>
         <td rowspan="2">Android</td>
         <td>
-          <a href="{{ base }}arm64-v8a.apk">
-            <img src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android">
-          </a><br>
-          <a href="{{ base }}lite_arm64-v8a.apk">
-            <img src="https://img.shields.io/badge/APK-ARMv8_Lite-96ed89.svg?logo=android">
-          </a>
+          <a href="{{ base }}arm64-v8a.apk"><img src="https://img.shields.io/badge/APK-ARMv8-168039.svg?logo=android"></a>
+          <br>
+          <a href="{{ base }}lite_arm64-v8a.apk"><img src="https://img.shields.io/badge/APK-ARMv8_Lite-96ed89.svg?logo=android"></a>
         </td>
       </tr>
       <tr>
         <td>
-          <a href="{{ base }}x64.apk">
-            <img src="https://img.shields.io/badge/APK-x64-0071C5.svg?logo=android">
-          </a>
+          <a href="{{ base }}x64.apk"><img src="https://img.shields.io/badge/APK-x64-0071C5.svg?logo=android"></a>
         </td>
       </tr>
 
@@ -61,12 +55,9 @@ body = """
       <tr>
         <td>Windows</td>
         <td>
-          <a href="{{ base }}windows_x64-setup.exe">
-            <img src="https://custom-icon-badges.demolab.com/badge/Setup-x64-2d7d9a.svg?logo=windows11">
-          </a><br>
-          <a href="{{ base }}windows_x64.exe">
-            <img src="https://custom-icon-badges.demolab.com/badge/Exe-x64-2d7d9a.svg?logo=windows11">
-          </a>
+          <a href="{{ base }}windows_x64-setup.exe"><img src="https://custom-icon-badges.demolab.com/badge/Setup-x64-2d7d9a.svg?logo=windows11"></a>
+          <br>
+          <a href="{{ base }}windows_x64.exe"><img src="https://custom-icon-badges.demolab.com/badge/Exe-x64-2d7d9a.svg?logo=windows11"></a>
         </td>
       </tr>
 
@@ -74,22 +65,16 @@ body = """
       <tr>
         <td rowspan="2">macOS</td>
         <td>
-          <a href="{{ base }}darwin_arm64.app.tar.gz">
-            <img src="https://img.shields.io/badge/App-Apple%20Silicon-%23000000.svg?logo=apple">
-          </a><br>
-          <a href="{{ base }}darwin_arm64.dmg">
-            <img src="https://img.shields.io/badge/DMG-Apple%20Silicon-%23000000.svg?logo=apple">
-          </a>
+          <a href="{{ base }}darwin_arm64.app.tar.gz"><img src="https://img.shields.io/badge/App-Apple%20Silicon-%23000000.svg?logo=apple"></a>
+          <br>
+          <a href="{{ base }}darwin_arm64.dmg"><img src="https://img.shields.io/badge/DMG-Apple%20Silicon-%23000000.svg?logo=apple"></a>
         </td>
       </tr>
       <tr>
         <td>
-          <a href="{{ base }}darwin_x64.app.tar.gz">
-            <img src="https://img.shields.io/badge/App-Intel%20X64-%2300A9E0.svg?logo=apple">
-          </a><br>
-          <a href="{{ base }}darwin_x64.dmg">
-            <img src="https://img.shields.io/badge/DMG-Intel%20X64-%2300A9E0.svg?logo=apple">
-          </a>
+          <a href="{{ base }}darwin_x64.app.tar.gz"><img src="https://img.shields.io/badge/App-Intel%20X64-%2300A9E0.svg?logo=apple"></a>
+          <br>
+          <a href="{{ base }}darwin_x64.dmg"><img src="https://img.shields.io/badge/DMG-Intel%20X64-%2300A9E0.svg?logo=apple"></a>
         </td>
       </tr>
 
@@ -97,25 +82,18 @@ body = """
       <tr>
         <td rowspan="2">Linux</td>
         <td>
-          <a href="{{ base }}linux_x64">
-            <img src="https://img.shields.io/badge/Binary-x64-f84e29.svg?logo=linux">
-          </a><br>
-          <a href="{{ base }}linux_x64.deb">
-            <img src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian">
-          </a>
+          <a href="{{ base }}linux_x64"><img src="https://img.shields.io/badge/Binary-x64-f84e29.svg?logo=linux"></a>
+          <br>
+          <a href="{{ base }}linux_x64.deb"><img src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"></a>
         </td>
       </tr>
       <tr>
         <td>
-          <a href="{{ base }}linux_arm64">
-            <img src="https://img.shields.io/badge/Binary-arm64-96ed89.svg?logo=linux">
-          </a><br>
-          <a href="{{ base }}linux_arm64.deb">
-            <img src="https://img.shields.io/badge/DebPackage-arm64-45bf55.svg?logo=debian">
-          </a>
+          <a href="{{ base }}linux_arm64"><img src="https://img.shields.io/badge/Binary-arm64-96ed89.svg?logo=linux"></a>
+          <br>
+          <a href="{{ base }}linux_arm64.deb"><img src="https://img.shields.io/badge/DebPackage-arm64-45bf55.svg?logo=debian"></a>
         </td>
       </tr>
-
     </tbody>
   </table>
 </div>
