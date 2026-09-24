@@ -423,7 +423,7 @@ export function App() {
 
     try {
       if (status?.isChecking) {
-        showToast("正在发送停止指令...", "info");
+        showToast("发送停止指令...", "info");
         const res = await sfetch("/api/force-close", { method: "POST" });
         if (res.ok) showToast("已发送停止指令", "success");
       } else {
@@ -726,11 +726,11 @@ export function App() {
         <div class="logo-box"><img src="/static/icon/subs-check-pro.svg" alt="Logo" /></div>
         <div class="slogan">高性能网络节点检测管理引擎</div>
         <div class="lp-footer">
-          <a class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>
+          <a className={`ver-tag ver-gui ${info?.guiVersion?.includes('-') ? 'pre' : ''}`} onClick={() => GuiApp.OpenInBrowser("https://github.com/sinspired/subs-free")}>
             GUI&nbsp;{info?.guiVersion || "dev"}
           </a>
           <span class="ver-dot">·</span>
-          <a class="ver-tag ver-core" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro")}>
+          <a class="ver-tag ver-core" onClick={() => GuiApp.OpenInBrowser("https://github.com/sinspired/subs-check-pro")}>
             内核&nbsp;{info?.coreVersion || "dev"}
           </a>
         </div>
@@ -770,7 +770,7 @@ export function App() {
                     <div class="stat-item"><span class="val">{lastStats.duration}</span><span class="lbl">检测耗时</span></div>
                     <div class="stat-item"><span class="val">{lastStats.traffic}</span><span class="lbl">消耗流量</span></div>
                   </div>
-                  <div class="status-text muted" style={{ fontSize: '11px', textAlign: 'right' }}>最后检测于: {lastStats.time}</div>
+                  <div class="status-text muted status-footer" >最后检测于: {lastStats.time}</div>
                 </Fragment>
               ) : (
                 <div class="status-text muted">{status?.lastResult || "尚无检测记录，一切准备就绪。"}</div>
@@ -912,7 +912,7 @@ export function App() {
 
           {/* 右侧：关于按钮*/}
           <button class="action-fab-small btn-about" onClick={() => { triggerHaptic("selection"); setSheetAbout(true); }}>
-            <svg viewBox="0 0 1024 1024" width="24" height="24"><path d="M858.026667 307.2H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466666c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466666c0 12.373333-9.813333 22.186667-22.186666 22.186667zM858.026667 546.133333H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186666v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186666zM858.026667 785.066667H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186666h672c12.373333 0 22.186667 9.813333 22.186666 22.186666v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186667z" fill="currentColor"></path></svg>
+            <svg class="btn-about-svg" viewBox="0 0 1024 1024" width="24" height="24"><path d="M858.026667 307.2H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466666c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466666c0 12.373333-9.813333 22.186667-22.186666 22.186667zM858.026667 546.133333H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186666v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186667h672c12.373333 0 22.186667 9.813333 22.186666 22.186667v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186666zM858.026667 785.066667H186.026667c-12.373333 0-22.186667-9.813333-22.186667-22.186667v-23.466667c0-12.373333 9.813333-22.186667 22.186667-22.186666h672c12.373333 0 22.186667 9.813333 22.186666 22.186666v23.466667c0 12.373333-9.813333 22.186667-22.186666 22.186667z" fill="currentColor"></path></svg>
           </button>
         </div>
       </footer>
@@ -922,7 +922,7 @@ export function App() {
         <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
           <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">订阅链接</h3>
-          <p class="sheet-desc">建议在 Subs Free 同一局域网的代理客户端导入以下链接</p>
+          <p class="sheet-desc">建议在 Subs Free 同局域网代理客户端导入以下链接</p>
           <div class="sheet-list">
             {[
               { title: "通用订阅", url: "/download/sub", icon: <svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> },
@@ -950,7 +950,7 @@ export function App() {
           <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
-          <button class="btn-primary-long" onClick={() => { copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
+          <button class="btn-config-copy" onClick={() => { copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
             <span class="btn-text">复制路径</span>
           </button>
         </div>
@@ -962,55 +962,53 @@ export function App() {
           <div class="about-header-mobile">
             <img src="/static/icon/subs-check-pro.svg" class="about-logo-mobile" />
             <div class="about-title-mobile">Subs Free</div>
-            <div class="about-desc-mobile">基于 Subs Check Pro v3 内核的高性能网络节点检测和管理客户端</div>
-            <div class="lp-footer" style={{ marginTop: '12px' }}>
-              <span class="ver-tag ver-gui" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free")}>GUI&nbsp;{info?.guiVersion || "dev"}</span>
-              <span class="ver-dot">·</span>
-              <span class="ver-tag ver-core" onClick={() => GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro")}>内核&nbsp;{info?.coreVersion || "dev"}</span>
-            </div>
+            <div class="about-desc-mobile">基于 Subs Check Pro v3 内核，请及时查看仓库更新软件</div>
           </div>
 
           <div class="about-links-grid">
             <div class="aw-link-card aw-featured" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
               <div class="aw-link-icon-wrap aw-featured-icon">
-                <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                <svg class="aw-link-svg" viewBox="0 0 24 24">
+                  <path d="M12,2C6.5,2,2,6.5,2,12s4.5,10,10,10s10-4.5,10-10S17.5,2,12,2z M16.9,8.1l-1.7,8.2c-0.1,0.6-0.5,0.7-0.9,0.4l-2.6-2 c-0.6,0.6-1.2,1.1-1.3,1.3c-0.2,0.1-0.3,0.3-0.5,0.3c-0.3,0-0.3-0.2-0.4-0.4l-0.9-3L5.9,12c-0.6-0.2-0.6-0.6,0.1-0.9l10.2-3.9 C16.6,7.1,17.1,7.3,16.9,8.1z M14.5,9l-5.7,3.6l0.9,3l0.2-2l4.9-4.4C15.1,8.9,14.9,8.9,14.5,9z" fill="currentColor" />
                 </svg>
               </div>
               <div class="aw-link-body">
-                <strong class="aw-link-title">Telegram 交流群</strong>
+                <strong class="aw-link-title">Telegram</strong>
                 <span class="aw-link-desc">技术交流 · 异常反馈 · 最新动态</span>
               </div>
-              <svg class="aw-link-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
+              <svg class="aw-link-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free"); }}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://github.com/sinspired/subs-free"); }}>
               <div class="aw-link-icon-wrap">
-                <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                <svg class="aw-link-svg" width="800px" height="800px" viewBox="0 0 24 24">
+                  <path d="M12,2A10,10,0,0,0,8.84,21.5c.5.08.66-.23.66-.5V19.31C6.73,19.91,6.14,18,6.14,18A2.69,2.69,0,0,0,5,16.5c-.91-.62.07-.6.07-.6a2.1,2.1,0,0,1,1.53,1,2.15,2.15,0,0,0,2.91.83,2.16,2.16,0,0,1,.63-1.34C8,16.17,5.62,15.31,5.62,11.5a3.87,3.87,0,0,1,1-2.71,3.58,3.58,0,0,1,.1-2.64s.84-.27,2.75,1a9.63,9.63,0,0,1,5,0c1.91-1.29,2.75-1,2.75-1a3.58,3.58,0,0,1,.1,2.64,3.87,3.87,0,0,1,1,2.71c0,3.82-2.34,4.66-4.57,4.91a2.39,2.39,0,0,1,.69,1.85V21c0,.27.16.59.67.5A10,10,0,0,0,12,2Z" fill="currentColor" />
                 </svg>
               </div>
               <div class="aw-link-body">
-                <strong class="aw-link-title">GUI 客户端仓库</strong>
-                <span class="aw-link-desc">获取 Windows、Linux、Mac 和 Android 客户端</span>
+                <strong class="aw-link-title">客户端</strong>
+                <span class="aw-link-desc">Windows、Linux、Mac、Android</span>
               </div>
-              <svg class="aw-link-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
+              <svg class="aw-link-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro"); }}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://github.com/sinspired/subs-check-pro"); }}>
               <div class="aw-link-icon-wrap">
-                <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                <svg class="aw-link-svg" width="800px" height="800px" viewBox="0 0 24 24">
+                  <path d="M12,2A10,10,0,0,0,8.84,21.5c.5.08.66-.23.66-.5V19.31C6.73,19.91,6.14,18,6.14,18A2.69,2.69,0,0,0,5,16.5c-.91-.62.07-.6.07-.6a2.1,2.1,0,0,1,1.53,1,2.15,2.15,0,0,0,2.91.83,2.16,2.16,0,0,1,.63-1.34C8,16.17,5.62,15.31,5.62,11.5a3.87,3.87,0,0,1,1-2.71,3.58,3.58,0,0,1,.1-2.64s.84-.27,2.75,1a9.63,9.63,0,0,1,5,0c1.91-1.29,2.75-1,2.75-1a3.58,3.58,0,0,1,.1,2.64,3.87,3.87,0,0,1,1,2.71c0,3.82-2.34,4.66-4.57,4.91a2.39,2.39,0,0,1,.69,1.85V21c0,.27.16.59.67.5A10,10,0,0,0,12,2Z" fill="currentColor" />
                 </svg>
               </div>
               <div class="aw-link-body">
-                <strong class="aw-link-title">内核引擎仓库</strong>
-                <span class="aw-link-desc">Sub-Check-Pro v3 引擎，支持全平台运行和 Docker 部署</span>
+                <strong class="aw-link-title">内核</strong>
+                <span class="aw-link-desc">Sub-Check-Pro v3 引擎</span>
               </div>
-              <svg class="aw-link-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
+              <svg class="aw-link-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
           </div>
