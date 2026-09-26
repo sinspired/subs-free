@@ -1,4 +1,4 @@
-// app.go
+// cmd\desktop\app.go
 package main
 
 import (
@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sinspired/subs-free/cmd/desktop/updater"
+	"github.com/sinspired/subs-free/updater"
 
 	"gopkg.in/yaml.v3"
 )

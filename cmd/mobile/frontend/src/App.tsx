@@ -1,6 +1,26 @@
+// cmd\mobile\frontend\src\App.tsx
 import { Fragment } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GuiApp } from "../bindings/github.com/sinspired/subs-free/cmd/mobile";
+import { md2html } from "./utils/markdown";
+
+// --- ES2019 Polyfills ---
+if (!(String.prototype as any).at) {
+  (String.prototype as any).at = function (n: number) {
+    n = Math.trunc(n) || 0;
+    if (n < 0) n += this.length;
+    if (n < 0 || n >= this.length) return undefined;
+    return String(this)[n];
+  };
+}
+if (!(Array.prototype as any).at) {
+  (Array.prototype as any).at = function (n: number) {
+    n = Math.trunc(n) || 0;
+    if (n < 0) n += this.length;
+    if (n < 0 || n >= this.length) return undefined;
+    return this[n];
+  };
+}
 
 // --- Types ---
 interface AppInfo {
@@ -36,6 +56,23 @@ interface LastStats {
   traffic: string;
 }
 
+// 更新信息接口
+interface UpdateInfo {
+  hasUpdate: boolean;
+  latestVersion: string;
+  currentVersion: string;
+  releaseNotes: string;
+  downloadURL: string;
+  apkNormalUrl?: string;
+  apkLiteUrl?: string;
+  error: string;
+  publishDate: string;
+  platform: string;
+  arch: string;
+  filetype: string;
+  assetSize: string;
+}
+
 export function App() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
@@ -67,12 +104,19 @@ export function App() {
   const [keyShown, setKeyShown] = useState(false);
   const [actionInFlight, setActionInFlight] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  // 更新状态管理
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
 
   // Bottom Sheets 与 Toast
   const [sheetSub, setSheetSub] = useState(false);
   const [sheetPath, setSheetPath] = useState(false);
   const [sheetAbout, setSheetAbout] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "info" | "success" | "error"; visible: boolean }>({ msg: "", type: "info", visible: false });
+
+  // Sub-Store 容器管理
+  const [subStoreUrl, setSubStoreUrl] = useState<string | null>(null);
 
   const pathRef = useRef<HTMLSpanElement>(null);
   const initTimerRef = useRef<number>();
@@ -87,6 +131,40 @@ export function App() {
       console.warn("震动反馈调用失败", e);
     }
   }, []);
+
+  // Bottom Sheet 拖拽滑下关闭 Hook
+  const bindDrag = useCallback((closeFn: () => void) => ({
+    onTouchStart: (e: any) => {
+      const touch = e.touches[0];
+      e.currentTarget.dataset.startY = String(touch.clientY);
+      e.currentTarget.dataset.dragging = "true";
+      const sheet = e.currentTarget.closest(".bottom-sheet");
+      if (sheet) sheet.style.transition = "none";
+    },
+    onTouchMove: (e: any) => {
+      if (e.currentTarget.dataset.dragging === "true") {
+        const touch = e.touches[0];
+        const delta = touch.clientY - parseFloat(e.currentTarget.dataset.startY || "0");
+        if (delta > 0) {
+          const sheet = e.currentTarget.closest(".bottom-sheet");
+          if (sheet) sheet.style.transform = `translateY(${delta}px)`;
+        }
+      }
+    },
+    onTouchEnd: (e: any) => {
+      e.currentTarget.dataset.dragging = "false";
+      const sheet = e.currentTarget.closest(".bottom-sheet");
+      if (sheet) {
+        sheet.style.transition = "";
+        const transformStr = sheet.style.transform;
+        sheet.style.transform = "";
+        const match = transformStr.match(/translateY\(([\d.]+)px\)/);
+        if (match && parseFloat(match[1]) > 50) {
+          closeFn();
+        }
+      }
+    }
+  }), []);
 
   // 弹窗状态管理（支持 JSX 内容与自动倒计时）
   const [countdown, setCountdown] = useState(0);
@@ -177,6 +255,82 @@ export function App() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
+
+  // 安卓静默更新检测
+  useEffect(() => {
+    let timer: number;
+    const checkSilent = async () => {
+      try {
+        if (typeof (GuiApp as any).GetUpdateInfo === 'function') {
+          const res = await (GuiApp as any).GetUpdateInfo();
+          if (res && res.hasUpdate) {
+            setUpdateInfo(res);
+          }
+        }
+      } catch (e) {
+        console.warn("静默检查更新失败:", e);
+      }
+    };
+    // 延迟 3 秒检查，不阻塞主流程
+    timer = window.setTimeout(checkSilent, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ── 手动触发更新检查 ──
+  const handleCheckUpdate = async () => {
+    if (checkingUpdate) return;
+    triggerHaptic("selection");
+
+    // 如果静默检测已经发现了新版本，点击时直接展示弹窗，免去多余的网络请求
+    if (updateInfo?.hasUpdate) {
+      setUpdateModalVisible(true);
+      setSheetAbout(false);
+      return;
+    }
+
+    setCheckingUpdate(true);
+    try {
+      const res = await (GuiApp as any).GetUpdateInfo();
+      if (res.error) {
+        showToast(`检查失败: ${res.error}`, "error");
+      } else if (res.hasUpdate) {
+        setUpdateInfo(res);
+        setUpdateModalVisible(true);
+        setSheetAbout(false); // 关闭关于面板，避免层级遮挡
+      } else {
+        showToast("当前已经是最新版本", "success");
+      }
+    } catch (e) {
+      showToast("检查更新异常", "error");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  // ── Sub-Store 容器管理 (拦截 Android 返回键) ──
+  const handleOpenSubStore = () => {
+    triggerHaptic("selection");
+    setSubStoreUrl(buildSubStoreUrl().url);
+    window.history.pushState({ subStoreOpen: true }, "");
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      // 当系统触发返回手势时，自动销毁 Sub-Store Iframe
+      setSubStoreUrl(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // 主页左下角版本号点击逻辑
+  const handleVersionClick = () => {
+    if (updateInfo?.hasUpdate) {
+      setUpdateModalVisible(true); // 有更新时唤起下载弹窗
+    } else {
+      (GuiApp as any).OpenInBrowser("https://github.com/sinspired/subs-free");
+    }
+  };
 
   const toggleTheme = () => {
     triggerHaptic("selection");
@@ -654,10 +808,10 @@ export function App() {
     let lo = 0, hi = path.length;
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1;
-      const candidate = path.slice(0, Math.ceil(mid / 2)) + "……" + path.slice(-Math.floor(mid / 2));
+      const candidate = path.slice(0, Math.ceil(mid / 2)) + "…" + path.slice(-Math.floor(mid / 2));
       if (ctx.measureText(candidate).width <= availW) lo = mid; else hi = mid;
     }
-    el.textContent = path.slice(0, Math.ceil(lo / 2)) + "……" + path.slice(-Math.floor(lo / 2));
+    el.textContent = path.slice(0, Math.ceil(lo / 2)) + "…" + path.slice(-Math.floor(lo / 2));
   };
 
   // 用回调 ref 代替"仅依赖 info?.configPath 的 useEffect"
@@ -725,12 +879,15 @@ export function App() {
         </button>
         <div class="logo-box"><img src="/static/icon/subs-check-pro.svg" alt="Logo" /></div>
         <div class="slogan">高性能网络节点检测管理引擎</div>
+
         <div class="lp-footer">
-          <a className={`ver-tag ver-gui ${info?.guiVersion?.includes('-') ? 'pre' : ''}`} onClick={() => GuiApp.OpenInBrowser("https://github.com/sinspired/subs-free")}>
+          {/* 置入 ver-tag (flex) 内部左侧 */}
+          <a class={`ver-tag ver-gui ${info?.guiVersion?.includes('-') ? 'pre' : ''} ${updateInfo?.hasUpdate ? 'ver-new' : ''}`} onClick={handleVersionClick}>
+            {updateInfo?.hasUpdate && <span class={`update-dot ${info?.guiVersion?.includes('-') ? 'pre' : ''}`}></span>}
             GUI&nbsp;{info?.guiVersion || "dev"}
           </a>
           <span class="ver-dot">·</span>
-          <a class="ver-tag ver-core" onClick={() => GuiApp.OpenInBrowser("https://github.com/sinspired/subs-check-pro")}>
+          <a class="ver-tag ver-core" onClick={() => (GuiApp as any).OpenInBrowser("https://github.com/sinspired/subs-check-pro")}>
             内核&nbsp;{info?.coreVersion || "dev"}
           </a>
         </div>
@@ -891,7 +1048,7 @@ export function App() {
           </button>
           {info?.subStorePort && (
             <Fragment>
-              <button class="btn-quick" onClick={() => { triggerHaptic("selection"); window.location.href = buildSubStoreUrl().url; }} title="订阅管理">
+              <button class="btn-quick" onClick={handleOpenSubStore} title="订阅管理">
                 <svg viewBox="0 0 108 108" fill="currentColor"><path d="M12.6 35C8.2 21.8 21 8.5 34.3 12.5c3.4 1 8.2 4.9 15.2 11.8l10.2 10.3-2.8 2.8-2.8 2.8-10-9.9c-8.2-8.2-10.7-9.9-14.2-9.9-9.2 0-12.5 10.6-5.4 17.4l3.8 3.8-2.8 3-2.8 3-4.2-4.1c-2.3-2.2-4.9-6-5.6-8.4h-.2z" /><path d="M48.1 46.5l-7.4 7.6 3.8 3.8 3.8 3.8-2.8 2.8-2.8 3-6.7-6.8-6.8-6.7 6.4-6.4c3.4-3.4 6.7-6.4 7.2-6.4s2 1.8 5.6 5.2zM59.7 46.5l7.4 7.6-3.8 3.8-3.8 3.8 2.8 2.8 2.8 3 6.7-6.8 6.8-6.7-6.4-6.4c-3.4-3.4-6.7-6.4-7.2-6.4s-2 1.8-5.6 5.2zM24.4 70.4c-4.5 5.2-5 10.8-1.3 14.6 4 4 10.3 3.4 14.8-1.3l3.8-3.8 3 2.8 3 2.8-4.1 4.2c-8 8.2-18.4 8.8-26 1-7.7-7.6-7.4-17.5.9-26l4-4.2 3 2.8 2.8 2.7-3.8 4.4zM83.6 37.6c4.5-5.2 5-10.8 1.3-14.6-4-4-10.3-3.4-14.8 1.3l-3.8 3.8-3-2.8-3-2.8 4.1-4.2c8-8.2 18.4-8.8 26-1 7.7 7.6 7.4 17.5-.9 26l-4 4.2-3-2.8-2.8-2.7 3.8-4.4z" /><path d="M95.4 73c4.4 13.3-8.4 26.5-21.6 22.5-3.4-1-8.2-4.9-15.2-11.8L48.4 73.4l2.8-2.8 2.8-2.8 10 9.9c8.2 8.2 10.7 9.9 14.2 9.9 9.2 0 12.5-10.6 5.4-17.4l-3.8-3.8 2.8-3 2.8-3 4.2 4.1c2.3 2.2 4.9 6 5.6 8.4z" /></svg>
               </button>
               <button class="btn-quick" onClick={() => { triggerHaptic("selection"); setSheetSub(true); }} title="订阅分享">
@@ -919,8 +1076,8 @@ export function App() {
 
       {/* --- Bottom Sheets 弹窗群 --- */}
       <div class={`bottom-sheet-overlay ${sheetSub ? "active" : ""}`} onClick={() => setSheetSub(false)}>
-        <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle"></div>
+        <div class="bottom-sheet subs-sheet" onClick={e => e.stopPropagation()}>
+          <div class="sheet-drag-handle" {...bindDrag(() => setSheetSub(false))}></div>
           <h3 class="sheet-title">订阅链接</h3>
           <p class="sheet-desc">建议在 Subs Free 同局域网代理客户端导入以下链接</p>
           <div class="sheet-list">
@@ -947,18 +1104,19 @@ export function App() {
 
       <div class={`bottom-sheet-overlay ${sheetPath ? "active" : ""}`} onClick={() => setSheetPath(false)}>
         <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle"></div>
+          <div class="sheet-drag-handle" {...bindDrag(() => setSheetPath(false))}></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
-          <button class="btn-config-copy" onClick={() => { copyText(info!.configPath, "配置文件路径"); }} style={{ width: '100%', marginTop: '16px' }}>
+          <button class="btn-config-copy" onClick={() => { copyText(info!.configPath, "配置文件路径"); }}>
             <span class="btn-text">复制路径</span>
           </button>
         </div>
       </div>
 
+      {/* ── 关于与资源弹窗 ── */}
       <div class={`bottom-sheet-overlay ${sheetAbout ? "active" : ""}`} onClick={() => setSheetAbout(false)}>
-        <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle"></div>
+        <div class="bottom-sheet about-sheet" onClick={e => e.stopPropagation()}>
+          <div class="sheet-drag-handle" {...bindDrag(() => setSheetAbout(false))}></div>
           <div class="about-header-mobile">
             <img src="/static/icon/subs-check-pro.svg" class="about-logo-mobile" />
             <div class="about-title-mobile">Subs Free</div>
@@ -966,8 +1124,32 @@ export function App() {
           </div>
 
           <div class="about-links-grid">
-            <div class="aw-link-card aw-featured" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
-              <div class="aw-link-icon-wrap aw-featured-icon">
+            {/* 检查更新按钮 */}
+            <button class={`premium-update-btn ${checkingUpdate ? "is-checking" : ""} ${updateInfo?.hasUpdate ? "has-update" : ""}`} onClick={handleCheckUpdate} disabled={checkingUpdate}>
+              <div class="pu-icon-wrap">
+                {checkingUpdate ? (
+                  <svg class="pu-icon icon-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" /></svg>
+                ) : updateInfo?.hasUpdate ? (
+                  <svg class="pu-icon icon-breath" viewBox="0 0 1024 1024" width="15" height="15"><path d="M520.533 460.8l-179.2 170.667h358.4L520.533 460.8zm-52.906 170.65v204.817H290.133c-122.47 0-221.866-103.766-221.866-231.63 0-105.13 67.003-193.62 158.856-222.344C275.046 267.861 384.65 187.733 512 187.733s236.954 80.128 284.877 194.56C888.73 410.54 955.733 499.49 955.733 604.638c0 127.863-99.396 231.629-221.866 231.629H556.373V631.45" fill="currentColor" /></svg>
+                ) : (
+                  <svg class="pu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                )}
+              </div>
+              <div class="pu-text-content">
+                <span class="pu-title">{checkingUpdate ? "检查新版本..." : updateInfo?.hasUpdate ? `发现新版本 ${updateInfo.latestVersion}` : "检查更新"}</span>
+                <span class="pu-subtitle">{checkingUpdate ? "正在连接服务器获取最新信息" : updateInfo?.hasUpdate ? "点击查看更新日志与下载详情" : `${info?.guiVersion || "dev"}`}</span>
+              </div>
+              <div class="pu-action-indicator">
+                {updateInfo?.hasUpdate && !checkingUpdate ? (
+                  <span class="update-dot"></span>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                )}
+              </div>
+            </button>
+
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
+              <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" viewBox="0 0 24 24">
                   <path d="M12,2C6.5,2,2,6.5,2,12s4.5,10,10,10s10-4.5,10-10S17.5,2,12,2z M16.9,8.1l-1.7,8.2c-0.1,0.6-0.5,0.7-0.9,0.4l-2.6-2 c-0.6,0.6-1.2,1.1-1.3,1.3c-0.2,0.1-0.3,0.3-0.5,0.3c-0.3,0-0.3-0.2-0.4-0.4l-0.9-3L5.9,12c-0.6-0.2-0.6-0.6,0.1-0.9l10.2-3.9 C16.6,7.1,17.1,7.3,16.9,8.1z M14.5,9l-5.7,3.6l0.9,3l0.2-2l4.9-4.4C15.1,8.9,14.9,8.9,14.5,9z" fill="currentColor" />
                 </svg>
@@ -1018,6 +1200,71 @@ export function App() {
         </div>
       </div>
 
+      {/* 下载更新弹窗 */}
+      <div class={`modal-overlay ${updateModalVisible ? "active" : ""}`} onClick={() => setUpdateModalVisible(false)}>
+        <div class="modal-content update-modal-content" onClick={e => e.stopPropagation()}>
+          <div class="modal-icon modal-icon-primary">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </div>
+          <h3 class="modal-title" >发现新版本</h3>
+          <div className={`ver-tag ver-gui ver-new-download ${updateInfo?.latestVersion?.includes('-') ? 'pre' : ''}`}>
+            {updateInfo?.latestVersion}
+          </div>
+
+          <div class="aw-update-details-card">
+            <div class="aw-update-meta-header">
+              <div class="aw-update-meta-item">
+                {/* <span class="aw-update-meta-label">Date</span> */}
+                <span class="aw-update-meta-val">{updateInfo?.publishDate || 'Unknown'}</span>
+              </div>
+
+              {updateInfo?.arch && (
+                <Fragment>
+                  <div class="aw-update-meta-divider" />
+                  <div class="aw-update-meta-item">
+                    <span class="aw-update-meta-label">ARCH</span>
+                    <span class="aw-update-meta-val">{updateInfo.arch}</span>
+                  </div>
+                </Fragment>
+              )}
+
+              {/* 通过 margin-left: auto 将 SIZE 推到最右*/}
+              {updateInfo?.assetSize && (
+                <div class="aw-update-meta-item" style={{ marginLeft: 'auto' }}>
+                  <span class="aw-update-meta-label">SIZE</span>
+                  <span class="aw-update-meta-val">{updateInfo.assetSize}</span>
+                </div>
+              )}
+            </div>
+
+            <div class="aw-update-notes"
+              dangerouslySetInnerHTML={{
+                __html: updateInfo?.releaseNotes ? md2html(updateInfo.releaseNotes) : "暂无更新日志"
+              }}
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
+                if (anchor) {
+                  e.preventDefault();
+                  (GuiApp as any).OpenInBrowser(anchor.href);
+                }
+              }}
+            />
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-modal cancel" onClick={() => setUpdateModalVisible(false)}>稍后</button>
+            <button class="btn-modal btn-primary" onClick={() => {
+              triggerHaptic("impact");
+              // 正常版读取 apkNormalUrl
+              const targetUrl = updateInfo?.apkNormalUrl || updateInfo?.downloadURL;
+              (GuiApp as any).OpenInBrowser(targetUrl);
+              setUpdateModalVisible(false);
+            }}>立即下载</button>
+          </div>
+        </div>
+      </div>
+
       {/* 自定义确认弹窗 DOM */}
       <div class={`modal-overlay ${confirmDialog.visible ? "active" : ""}`} onClick={confirmDialog.onCancel}>
         <div class="modal-content" onClick={e => e.stopPropagation()}>
@@ -1033,16 +1280,22 @@ export function App() {
           <div class="modal-actions">
             <button class="btn-modal cancel" onClick={confirmDialog.onCancel}>取消</button>
 
-            {/* 👇 增加倒计时的展示 👇 */}
+            {/* 倒计时展示 */}
             <button class={`btn-modal confirm btn-${confirmDialog.type}`} onClick={confirmDialog.onConfirm}>
               继续 {confirmDialog.autoConfirm && countdown > 0 ? `(${countdown}s)` : ""}
             </button>
-
           </div>
         </div>
       </div>
 
       <div class={`toast toast-${toast.type} ${toast.visible ? "show" : ""}`}>{toast.msg}</div>
+
+      {/* --- Sub-Store 全屏容器 --- */}
+      {subStoreUrl && (
+        <div class="sub-store-overlay">
+          <iframe class="sub-store-iframe" src={subStoreUrl} />
+        </div>
+      )}
     </div>
   );
 }

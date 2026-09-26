@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@wailsio/runtime": "latest",
+    "dompurify": "^3.4.15",
+    "marked": "^18.0.14",
     "preact": "^10.29.8"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
+    "@types/dompurify": "^3.2.0",
     "@types/node": "^26.6.1",
     "cross-env": "^10.1.0",
     "typescript": "^7.0.2",

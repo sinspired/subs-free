@@ -1,3 +1,4 @@
+// cmd\mobile\main.go
 package main
 
 import (
@@ -10,6 +11,9 @@ import (
 	coreapp "github.com/sinspired/subs-check-pro/v3/app"
 	"github.com/sinspired/subs-check-pro/v3/utils"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/updater"
+	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
+	guiupdater "github.com/sinspired/subs-free/updater"
 )
 
 var (
@@ -84,6 +88,43 @@ func main() {
 
 	// 将实例化后的 app 赋值给全局变量，否则事件没法发出！
 	globalApp = app
+
+	// 始化无 UI 版 Wails 更新器 ---
+	currentVer := strings.TrimPrefix(GuiVersion, "v")
+	if currentVer == "" || currentVer == "dev" {
+		currentVer = "0.0.0"
+	}
+
+	// 针对安卓端定制：直接过滤并选取 .apk 安装包
+	ghProvider, ghErr := github.New(github.Config{
+		Repository:    "sinspired/subs-free",
+		ChecksumAsset: "SHA256SUMS",
+		HTTPClient:    guiupdater.NewHTTPClient(), // 复用防污染/指纹伪装网络请求
+		AssetMatcher: func(req updater.CheckRequest, assets []github.ReleaseAsset) int {
+			// 移动端专用匹配器：强行抓取 .apk
+			for i, a := range assets {
+				if strings.HasSuffix(strings.ToLower(a.Name), ".apk") {
+					return i
+				}
+			}
+			return -1
+		},
+	})
+
+	if ghErr != nil {
+		slog.Warn("Mobile Updater: 初始化 GitHub provider 失败", "error", ghErr)
+	} else {
+		// 移动端由于没有自动重启更新闭环，仅保留检查能力即可
+		_ = app.Updater.Init(updater.Config{
+			CurrentVersion: currentVer,
+			Providers:      []updater.Provider{ghProvider},
+			CheckInterval:  0,                  // 禁用后台定时轮询，交给前端通过 GetUpdateInfo 主动控制
+			Window:         updater.WindowNone, // 绝对不能弹窗
+		})
+		slog.Debug("Mobile Updater: 已初始化", "currentVersion", currentVer)
+	}
+	// 将注入更新器的 app 挂载到 guiApp 以供调用
+	guiApp.updaterApp = app
 
 	guiApp.mainWindow = app.Window.NewWithOptions(
 		application.WebviewWindowOptions{

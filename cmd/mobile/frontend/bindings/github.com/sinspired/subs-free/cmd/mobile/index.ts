@@ -10,5 +10,6 @@ export type {
     AppInfo,
     CheckState,
     PublicInfo,
-    SafeArea
+    SafeArea,
+    UpdateInfo
 } from "./models.js";

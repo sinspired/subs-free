@@ -74,6 +74,13 @@ export function GetSafeArea(): $CancellablePromise<$models.SafeArea> {
 }
 
 /**
+ * GetUpdateInfo 供前端调用，获取更新数据并自动拼接内置反代服务器地址
+ */
+export function GetUpdateInfo(): $CancellablePromise<$models.UpdateInfo> {
+    return $Call.ByID(1712625151);
+}
+
+/**
  * HapticFeedback 震动反馈
  */
 export function HapticFeedback(hapticType: string): $CancellablePromise<void> {

@@ -48,3 +48,30 @@ export interface SafeArea {
     "left": number;
     "right": number;
 }
+
+/**
+ * 更新所需的模型与接口
+ */
+export interface UpdateInfo {
+    "hasUpdate": boolean;
+    "latestVersion": string;
+    "currentVersion": string;
+    "releaseNotes": string;
+    "downloadURL": string;
+
+    /**
+     * 正常版直链
+     */
+    "apkNormalUrl": string;
+
+    /**
+     * Lite版直链
+     */
+    "apkLiteUrl": string;
+    "publishDate": string;
+    "platform": string;
+    "arch": string;
+    "filetype": string;
+    "assetSize": string;
+    "error": string;
+}

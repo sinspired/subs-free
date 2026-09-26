@@ -23,6 +23,8 @@ import (
 // utils.GetGhProxy() 的并发测速结果决定（见 resolveGhProxyBase）。
 const GhProxyBase = "https://proxy.linkpc.dpdns.org/"
 
+var GhProxyResolved = GhProxyBase
+
 // MaxDownloadDuration 是整个更新下载流程能接受的最长耗时。实测在网络受限
 // 环境下，即便链路始终"活着"、没有中断，完整下载也可能需要十几二十
 // 分钟，因此预算不能卡得太紧；调用方（触发 Updater.DownloadAndInstall
@@ -419,6 +421,8 @@ func (t *speedGuardTransport) RoundTrip(req *http.Request) (*http.Response, erro
 func NewHTTPClient() *http.Client {
 	ghProxyBase := resolveGhProxyBase()
 	sysProxyOK := utils.GetSysProxy()
+
+	GhProxyResolved = ghProxyBase
 
 	ghBase := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,

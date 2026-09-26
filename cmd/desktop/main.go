@@ -1,3 +1,4 @@
+// cmd\desktop\main.go
 package main
 
 import (
@@ -7,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	guiupdater "github.com/sinspired/subs-free/cmd/desktop/updater"
+	guiupdater "github.com/sinspired/subs-free/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"

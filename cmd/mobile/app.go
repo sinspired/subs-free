@@ -1,15 +1,20 @@
+// cmd\mobile\app.go
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 	coreapp "github.com/sinspired/subs-check-pro/v3/app"
 	"github.com/sinspired/subs-check-pro/v3/config"
+	guiupdater "github.com/sinspired/subs-free/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -33,6 +38,8 @@ type GuiApp struct {
 	// 判断 KeyIsRandom 会一直显示"仍是随机密钥"，直到重启进程为止。
 	// 这个字段用来让 GetAppInfo 在本次运行内也能立刻反映出"已手动设置"。
 	keyManualOverride bool
+
+	updaterApp *application.App
 }
 
 type AppInfo struct {
@@ -77,6 +84,23 @@ type SafeArea struct {
 	Bottom int `json:"bottom"`
 	Left   int `json:"left"`
 	Right  int `json:"right"`
+}
+
+// 更新所需的模型与接口
+type UpdateInfo struct {
+	HasUpdate      bool   `json:"hasUpdate"`
+	LatestVersion  string `json:"latestVersion"`
+	CurrentVersion string `json:"currentVersion"`
+	ReleaseNotes   string `json:"releaseNotes"`
+	DownloadURL    string `json:"downloadURL"`
+	ApkNormalURL   string `json:"apkNormalUrl"` // 正常版直链
+	ApkLiteURL     string `json:"apkLiteUrl"`   // Lite版直链
+	PublishDate    string `json:"publishDate"`
+	Platform       string `json:"platform"`
+	Arch           string `json:"arch"`
+	Filetype       string `json:"filetype"`
+	AssetSize      string `json:"assetSize"`
+	Error          string `json:"error"`
 }
 
 func (g *GuiApp) GetAppInfo() AppInfo {
@@ -149,6 +173,84 @@ func (g *GuiApp) GetPublicInfo() PublicInfo {
 	}
 }
 
+// GetUpdateInfo 供前端调用，获取更新数据并自动拼接内置反代服务器地址
+func (g *GuiApp) GetUpdateInfo() UpdateInfo {
+	if g.updaterApp == nil {
+		return UpdateInfo{Error: "更新器未初始化"}
+	}
+
+	// 复用桌面端设定的超时（默认20秒）
+	ctx, cancel := context.WithTimeout(context.Background(), guiupdater.CheckTimeout)
+	defer cancel()
+
+	rel, err := g.updaterApp.Updater.Check(ctx)
+	if err != nil {
+		return UpdateInfo{Error: "检查更新失败: " + err.Error()}
+	}
+
+	current := GuiVersion
+	if current == "" || current == "dev" {
+		current = "0.0.0"
+	}
+
+	if rel == nil {
+		return UpdateInfo{
+			HasUpdate:      false,
+			CurrentVersion: current,
+		}
+	}
+
+	tagName := rel.Version
+	if !strings.HasPrefix(tagName, "v") {
+		tagName = "v" + tagName
+	}
+
+	targetURL := fmt.Sprintf("https://github.com/sinspired/subs-free/releases/tag/%s", tagName)
+
+	// 动态构建 Android 直链
+	var apkNormalURL, apkLiteURL string
+	if runtime.GOOS == "android" {
+		// 映射 Go 的架构到 Action 构建产物的架构
+		archName := runtime.GOARCH
+		switch archName {
+		case "amd64":
+			archName = "x64"
+		case "arm64":
+			archName = "arm64-v8a"
+		case "386":
+			archName = "x86"
+		}
+
+		// 结合代理和 tag，拼接完整下载链接
+		baseDownloadURL := fmt.Sprintf("%shttps://github.com/sinspired/subs-free/releases/download/%s", guiupdater.GhProxyResolved, tagName)
+		apkNormalURL = fmt.Sprintf("%s/subs-free_%s.apk", baseDownloadURL, archName)
+		apkLiteURL = fmt.Sprintf("%s/subs-free_lite_%s.apk", baseDownloadURL, archName)
+	}
+
+	sizeMB := float64(rel.Artifact.Size) / (1024 * 1024)
+	sizeStr := fmt.Sprintf("%.2f MB", sizeMB)
+
+	pubDate := ""
+	if !rel.PublishedAt.IsZero() {
+		pubDate = rel.PublishedAt.Format("2006-01-02")
+	}
+
+	return UpdateInfo{
+		HasUpdate:      true,
+		LatestVersion:  tagName,
+		CurrentVersion: current,
+		ReleaseNotes:   rel.Notes,
+		DownloadURL:    guiupdater.GhProxyResolved + targetURL,
+		ApkNormalURL:   apkNormalURL,
+		ApkLiteURL:     apkLiteURL,
+		PublishDate:    pubDate,
+		Platform:       rel.Artifact.Platform,
+		Arch:           rel.Artifact.Arch,
+		Filetype:       rel.Artifact.Filetype,
+		AssetSize:      sizeStr,
+	}
+}
+
 // SaveConfig 保留作为向后兼容的绑定入口（例如首页如果还想直接调用它）。
 // 内部不再是裸的 os.WriteFile，而是改为走 APIProxy 调用真正的 /api/config
 // 处理逻辑——这样保存配置时才会附带触发 Sub-Store 后台同步等完整副作用，
@@ -216,17 +318,9 @@ func (g *GuiApp) APIProxy(method, path, body string) string {
 		return fail(503, "内核尚未就绪")
 	}
 
-	// 测试 Wails v3 全局事件发送。
-	// 注意：Wails v3 使用 application.App.Event.Emit，而不是 App.EmitEvent。
-	if path == "/api/status" &&
-		globalGuiApp != nil &&
-		globalGuiApp.mainWindow != nil {
-
+	if path == "/api/status" && globalGuiApp != nil && globalGuiApp.mainWindow != nil {
 		if globalApp != nil {
-			globalApp.Event.Emit(
-				"ApiProxy",
-				"当前正在请求: "+path,
-			)
+			globalApp.Event.Emit("ApiProxy", "当前正在请求: "+path)
 		}
 	}
 
@@ -235,11 +329,7 @@ func (g *GuiApp) APIProxy(method, path, body string) string {
 		return fail(503, "路由器尚未初始化")
 	}
 
-	req := httptest.NewRequest(
-		strings.ToUpper(method),
-		path,
-		strings.NewReader(body),
-	)
+	req := httptest.NewRequest(strings.ToUpper(method), path, strings.NewReader(body))
 
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
