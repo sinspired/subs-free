@@ -336,8 +336,8 @@ github.com/sinspired/checkip v0.5.4 h1:0oRABIGV5ucp9ZBxZuSKOtBOGKi8AiNmHnthhbGwn
 github.com/sinspired/checkip v0.5.4/go.mod h1:bLaDeobpiwXZ2J5wXekSnpDBLv7J5LOLxnzJ4A1grrM=
 github.com/sinspired/subs-check-pro-webui v1.3.5 h1:lE9YNPLUQX1bezvrkSYd7R7zlUxTv/acmX8N2fs00Mk=
 github.com/sinspired/subs-check-pro-webui v1.3.5/go.mod h1:rg8DBZnTSh5/5tHCwQJrMVX6tKqqI5m8BrTT+gCB92M=
-github.com/sinspired/subs-check-pro/v3 v3.2.0 h1:5H9wdmNEQvQhWCVMmPPgdx8dgzoBKdc+8XhX6xk0a4A=
-github.com/sinspired/subs-check-pro/v3 v3.2.0/go.mod h1:u2dGoIzUYFud0VHriVCiT3dFjFlbrznfCq+QgQ7SISQ=
+github.com/sinspired/subs-check-pro/v3 v3.2.1 h1:CIc9yakOyWXZ3RPgfkQvXGmnOM56deNw7e4azu+JHUc=
+github.com/sinspired/subs-check-pro/v3 v3.2.1/go.mod h1:u2dGoIzUYFud0VHriVCiT3dFjFlbrznfCq+QgQ7SISQ=
 github.com/sirupsen/logrus v1.10.2 h1:G2SED73/qrAu6YwbdxOD6peLkCBI3z7L+ykJFTXJBBo=
 github.com/sirupsen/logrus v1.10.2/go.mod h1:SLEg8TqYulVKKfIGHldVp2K2aYz2DKSVBq4g/H5bR7Q=
 github.com/sohaha/zlsgo v1.7.21 h1:8FF+aHJUvA0MudSYGY+AUipy+UFgDbJQhSIhPE6f1Fs=
