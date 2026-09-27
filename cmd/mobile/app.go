@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -122,41 +123,30 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 	subPort := strings.TrimPrefix(config.GlobalConfig.SubStorePort, ":")
 	subPath := "/" + strings.TrimPrefix(config.GlobalConfig.SubStorePath, "/")
 
-	singBoxLatestVer := config.GlobalConfig.SingboxLatest.Version
-	singBoxExtraVer := config.GlobalConfig.SingboxExtra.Version
-
-	coreVer := Version
-
 	return AppInfo{
 		APIKey:           config.GlobalConfig.APIKey,
 		ListenPort:       port,
 		SubStorePort:     subPort,
 		SubStorePath:     subPath,
-		SingBoxExtraVer:  singBoxExtraVer,
-		SingBoxLatestVer: singBoxLatestVer,
+		SingBoxExtraVer:  config.GlobalConfig.SingboxExtra.Version,
+		SingBoxLatestVer: config.GlobalConfig.SingboxLatest.Version,
 		KeyIsRandom:      !g.keyManualOverride && os.Getenv("GUI_KEY_IS_RANDOM") == "1",
 		IsFirstRun:       g.isFirstRun,
 		ConfigPath:       g.configPath,
 		PendingInit:      !g.backendReady,
 		InitErr:          g.initErr,
 		GuiVersion:       GuiVersion,
-		CoreVersion:      coreVer,
+		CoreVersion:      Version,
 	}
 }
 
 func (g *GuiApp) GetCheckState() CheckState {
 	if !g.backendReady || g.backend == nil {
-		return CheckState{
-			IsChecking: false,
-			StepName:   "内核未就绪",
-		}
+		return CheckState{IsChecking: false, StepName: "内核未就绪"}
 	}
-
-	isChecking := g.backend.IsChecking()
 	st := g.backend.GetCurrentState()
-
 	return CheckState{
-		IsChecking: isChecking,
+		IsChecking: g.backend.IsChecking(),
 		StepName:   st.StepName,
 		Available:  st.Available,
 		Progress:   st.Progress,
@@ -181,6 +171,59 @@ func (g *GuiApp) GetPublicInfo() PublicInfo {
 		GuiVersion:   GuiVersion,
 		CoreVersion:  Version,
 	}
+}
+
+// compareVersions 完美实现 SemVer 对比。v1 > v2 返回 1，v1 < v2 返回 -1，相等返回 0
+func compareVersions(v1, v2 string) int {
+	parse := func(v string) ([]int, string) {
+		v = strings.TrimPrefix(v, "v")
+		parts := strings.SplitN(v, "-", 2)
+		nums := make([]int, 3)
+		mainParts := strings.Split(parts[0], ".")
+		for i := 0; i < 3 && i < len(mainParts); i++ {
+			nums[i], _ = strconv.Atoi(mainParts[i])
+		}
+		pre := ""
+		if len(parts) > 1 {
+			pre = parts[1]
+		}
+		return nums, pre
+	}
+
+	n1, pre1 := parse(v1)
+	n2, pre2 := parse(v2)
+
+	for i := 0; i < 3; i++ {
+		if n1[i] != n2[i] {
+			if n1[i] > n2[i] {
+				return 1
+			}
+			return -1
+		}
+	}
+
+	isStable1 := pre1 == ""
+	isStable2 := pre2 == ""
+
+	// 正式版永远大于预发布版
+	if isStable1 && !isStable2 {
+		return 1
+	}
+	if !isStable1 && isStable2 {
+		return -1
+	}
+	if isStable1 && isStable2 {
+		return 0
+	}
+
+	// 如果都是预发布版，执行字典序对比 (如 rc.2 > rc.1)
+	if pre1 > pre2 {
+		return 1
+	}
+	if pre1 < pre2 {
+		return -1
+	}
+	return 0
 }
 
 // GetUpdateInfo 供前端调用，获取更新数据并自动拼接内置反代服务器地址
@@ -229,21 +272,16 @@ func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
 	}
 
 	hasUpdate := false
-	currTag := current
-	if !strings.HasPrefix(currTag, "v") {
-		currTag = "v" + currTag
-	}
-	if tagName != currTag && current != "0.0.0" {
-		hasUpdate = true
+	if current != "0.0.0" && tagName != "" {
+		if compareVersions(tagName, current) > 0 {
+			hasUpdate = true
+		}
 	} else if current == "0.0.0" && tagName != "" {
 		hasUpdate = true
 	}
 
 	if !hasUpdate {
-		return UpdateInfo{
-			HasUpdate:      false,
-			CurrentVersion: current,
-		}
+		return UpdateInfo{HasUpdate: false, CurrentVersion: current}
 	}
 
 	targetURL := fmt.Sprintf("https://github.com/sinspired/subs-free/releases/tag/%s", tagName)
