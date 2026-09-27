@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"runtime"
@@ -38,8 +39,6 @@ type GuiApp struct {
 	// 判断 KeyIsRandom 会一直显示"仍是随机密钥"，直到重启进程为止。
 	// 这个字段用来让 GetAppInfo 在本次运行内也能立刻反映出"已手动设置"。
 	keyManualOverride bool
-
-	updaterApp *application.App
 }
 
 type AppInfo struct {
@@ -101,6 +100,17 @@ type UpdateInfo struct {
 	Filetype       string `json:"filetype"`
 	AssetSize      string `json:"assetSize"`
 	Error          string `json:"error"`
+}
+
+type GHRelease struct {
+	TagName     string `json:"tag_name"`
+	Body        string `json:"body"`
+	PublishedAt string `json:"published_at"`
+	Assets      []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+		Size               int64  `json:"size"`
+	} `json:"assets"`
 }
 
 func (g *GuiApp) GetAppInfo() AppInfo {
@@ -174,18 +184,38 @@ func (g *GuiApp) GetPublicInfo() PublicInfo {
 }
 
 // GetUpdateInfo 供前端调用，获取更新数据并自动拼接内置反代服务器地址
-func (g *GuiApp) GetUpdateInfo() UpdateInfo {
-	if g.updaterApp == nil {
-		return UpdateInfo{Error: "更新器未初始化"}
-	}
+func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
+	defer func() {
+		if r := recover(); r != nil {
+			info = UpdateInfo{Error: fmt.Sprintf("检查更新崩溃: %v", r)}
+		}
+	}()
 
 	// 复用桌面端设定的超时（默认20秒）
 	ctx, cancel := context.WithTimeout(context.Background(), guiupdater.CheckTimeout)
 	defer cancel()
 
-	rel, err := g.updaterApp.Updater.Check(ctx)
+	// 使用内置封装好反代/指纹伪装的 HTTP Client
+	client := guiupdater.NewHTTPClient()
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/sinspired/subs-free/releases/latest", nil)
 	if err != nil {
-		return UpdateInfo{Error: "检查更新失败: " + err.Error()}
+		return UpdateInfo{Error: "创建请求失败: " + err.Error()}
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return UpdateInfo{Error: "请求失败: " + err.Error()}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return UpdateInfo{Error: fmt.Sprintf("API状态码异常: %d", resp.StatusCode)}
+	}
+
+	var rel GHRelease
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return UpdateInfo{Error: "解析数据失败: " + err.Error()}
 	}
 
 	current := GuiVersion
@@ -193,16 +223,27 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 		current = "0.0.0"
 	}
 
-	if rel == nil {
+	tagName := rel.TagName
+	if !strings.HasPrefix(tagName, "v") {
+		tagName = "v" + tagName
+	}
+
+	hasUpdate := false
+	currTag := current
+	if !strings.HasPrefix(currTag, "v") {
+		currTag = "v" + currTag
+	}
+	if tagName != currTag && current != "0.0.0" {
+		hasUpdate = true
+	} else if current == "0.0.0" && tagName != "" {
+		hasUpdate = true
+	}
+
+	if !hasUpdate {
 		return UpdateInfo{
 			HasUpdate:      false,
 			CurrentVersion: current,
 		}
-	}
-
-	tagName := rel.Version
-	if !strings.HasPrefix(tagName, "v") {
-		tagName = "v" + tagName
 	}
 
 	targetURL := fmt.Sprintf("https://github.com/sinspired/subs-free/releases/tag/%s", tagName)
@@ -227,26 +268,32 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 		apkLiteURL = fmt.Sprintf("%s/subs-free_lite_%s.apk", baseDownloadURL, archName)
 	}
 
-	sizeMB := float64(rel.Artifact.Size) / (1024 * 1024)
+	var sizeMB float64 = 0
+	for _, a := range rel.Assets {
+		if strings.HasSuffix(strings.ToLower(a.Name), ".apk") {
+			sizeMB = float64(a.Size) / (1024 * 1024)
+			break
+		}
+	}
 	sizeStr := fmt.Sprintf("%.2f MB", sizeMB)
 
-	pubDate := ""
-	if !rel.PublishedAt.IsZero() {
-		pubDate = rel.PublishedAt.Format("2006-01-02")
+	pubDate := rel.PublishedAt
+	if len(pubDate) > 10 {
+		pubDate = pubDate[:10]
 	}
 
 	return UpdateInfo{
 		HasUpdate:      true,
 		LatestVersion:  tagName,
 		CurrentVersion: current,
-		ReleaseNotes:   rel.Notes,
+		ReleaseNotes:   rel.Body,
 		DownloadURL:    guiupdater.GhProxyResolved + targetURL,
 		ApkNormalURL:   apkNormalURL,
 		ApkLiteURL:     apkLiteURL,
 		PublishDate:    pubDate,
-		Platform:       rel.Artifact.Platform,
-		Arch:           rel.Artifact.Arch,
-		Filetype:       rel.Artifact.Filetype,
+		Platform:       runtime.GOOS,
+		Arch:           runtime.GOARCH,
+		Filetype:       "apk",
 		AssetSize:      sizeStr,
 	}
 }
