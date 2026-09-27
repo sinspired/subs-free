@@ -1,3 +1,4 @@
+// updater\client.go
 package updater
 
 import (
@@ -230,6 +231,15 @@ func withBrowserHeaders(req *http.Request) {
 	}
 	if req.Header.Get("Accept-Language") == "" {
 		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7")
+	}
+	// 针对 GitHub 相关域名自动加 Token
+	host := strings.ToLower(req.URL.Host)
+	if strings.Contains(host, "github.com") ||
+		strings.Contains(host, "github.io") ||
+		strings.Contains(host, "raw.githubusercontent.com") {
+		if token := config.GlobalConfig.GithubToken; token != "" {
+			req.Header.Set("Authorization", "token "+token)
+		}
 	}
 }
 
