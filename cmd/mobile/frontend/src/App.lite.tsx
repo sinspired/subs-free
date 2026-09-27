@@ -1,6 +1,6 @@
 // cmd\mobile\frontend\src\App.lite.tsx
 import { Fragment } from "preact";
-import { useState, useEffect, useRef, useCallback } from "preact/hooks";
+import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import { GuiApp } from "../bindings/github.com/sinspired/subs-free/cmd/mobile";
 import { md2html } from "./utils/markdown";
 
@@ -253,13 +253,27 @@ export function App() {
     };
   }, []);
 
+  // 引入更新检查单例 Promise，杜绝时序竞态现象
+  const updateCheckPromise = useRef<Promise<UpdateInfo> | null>(null);
+
+  const fetchUpdateSafe = (): Promise<UpdateInfo> => {
+    if (!updateCheckPromise.current) {
+      updateCheckPromise.current = Promise.resolve((GuiApp as any).GetUpdateInfo()).finally(() => {
+        // 请求结束后清理单例，允许下一次全新点击时重新发请求
+        updateCheckPromise.current = null;
+      });
+    }
+    // 不管是第几次调用，只要有网络请求在飞，就直接返回这个正在飞的 Promise 给调用者
+    return updateCheckPromise.current;
+  };
+
   // 安卓静默更新检测
   useEffect(() => {
     let timer: number;
     const checkSilent = async () => {
       try {
         if (typeof (GuiApp as any).GetUpdateInfo === 'function') {
-          const res = await (GuiApp as any).GetUpdateInfo();
+          const res = await fetchUpdateSafe();
           if (res && res.hasUpdate) {
             setUpdateInfo(res);
           }
@@ -286,8 +300,13 @@ export function App() {
     }
 
     setCheckingUpdate(true);
+
+    // 防止底层 API 请求和大量 Markdown 渲染阻塞微任务队列导致的 UI 假死
+    await new Promise(r => setTimeout(r, 60));
+
     try {
-      const res = await (GuiApp as any).GetUpdateInfo();
+      // 若此时后台的 checkSilent 正在执行，这里会自动复用它的请求等待其完成，绝对不会发出第二次！
+      const res = await fetchUpdateSafe();
       if (res.error) {
         showToast(`检查失败: ${res.error}`, "error");
       } else if (res.hasUpdate) {
@@ -801,6 +820,12 @@ export function App() {
 
   useEffect(() => () => pathObserverCleanup.current?.(), []);
 
+  // 用 useMemo 缓存解析结果，避免每次渲染都跑一遍 Markdown 转换
+  const parsedReleaseNotes = useMemo(() => {
+    if (!updateInfo?.releaseNotes) return "暂无更新日志";
+    return md2html(updateInfo.releaseNotes);
+  }, [updateInfo?.releaseNotes]);
+
   // 渲染分支
   if (loading) {
     return (
@@ -1071,7 +1096,7 @@ export function App() {
 
           <div class="about-links-grid">
             {/* 检查更新按钮 */}
-            <button class={`premium-update-btn ${checkingUpdate ? "is-checking" : ""} ${updateInfo?.hasUpdate ? "has-update" : ""}`} onClick={handleCheckUpdate} disabled={checkingUpdate}>
+            <button class={`premium-update-btn ${checkingUpdate ? "is-checking" : ""} ${updateInfo?.hasUpdate && !checkingUpdate ? "has-update" : ""}`} onClick={handleCheckUpdate} disabled={checkingUpdate}>
               <div class="pu-icon-wrap">
                 {checkingUpdate ? (
                   <svg class="pu-icon icon-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" /></svg>
@@ -1185,7 +1210,7 @@ export function App() {
 
             <div class="aw-update-notes"
               dangerouslySetInnerHTML={{
-                __html: updateInfo?.releaseNotes ? md2html(updateInfo.releaseNotes) : "暂无更新日志"
+                __html: parsedReleaseNotes
               }}
               onClick={(e) => {
                 const target = e.target as HTMLElement;
