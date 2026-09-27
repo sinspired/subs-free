@@ -897,7 +897,7 @@ export function App() {
         {/* 状态卡片 */}
         <div class="card status-card">
           <div class="status-header">
-            <span class={`label ${isChecking || finalizing ? "checking-label" : ""}`}>{isChecking ? status?.stepName : finalizing ? "生成报告中" : "运行状态"}</span>
+            <span class={`label ${isChecking || finalizing ? "checking-label" : ""}`}>{isChecking ? status?.stepName : finalizing ? "整理检测结果" : "运行状态"}</span>
             <div class={`status-badge ${isChecking || finalizing ? "checking" : "idle"}`}>
               <span class="dot"></span>{isChecking ? "检测中" : finalizing ? "整理中" : "空闲"}
             </div>
