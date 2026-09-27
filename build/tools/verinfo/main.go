@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const coreModule = "github.com/sinspired/subs-check-pro/v3"
@@ -46,7 +47,7 @@ func die(format string, args ...any) {
 
 func main() {
 	if len(os.Args) < 2 {
-		die("missing subcommand (core-version | core-commit | numeric | gen-syso)")
+		die("missing subcommand (core-version | core-commit | numeric | android-code | gen-syso)")
 	}
 
 	switch os.Args[1] {
@@ -110,8 +111,7 @@ func parseCoreVersion(goModPath string) (string, error) {
 	}
 	return m[1], nil
 }
-
-// ── core-version ────────────────────────────────────────────────────────────
+// core-version
 
 func coreVersion() string {
 	if v := strings.TrimSpace(os.Getenv("CORE_VERSION")); v != "" {
@@ -134,7 +134,7 @@ func coreVersion() string {
 	return v
 }
 
-// ── core-commit ─────────────────────────────────────────────────────────────
+// core-commit
 
 // moduleDownloadInfo 对应 `go mod download -json` 输出中我们关心的字段。
 type moduleDownloadInfo struct {
@@ -190,58 +190,72 @@ func coreCommit() string {
 	return hash
 }
 
-// ── numeric（semver → 4 段数字版本，供 Windows 资源版本号使用）──────────────
+// numeric（semver → 4 段数字版本，供 Windows 资源版本号使用
 
-var numericVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:[^0-9]*(\d+))?`)
-
-// toNumericVersion 将形如 "v1.2.3-beta.5" 的版本号转换为 Windows 资源
-// 版本号要求的 4 段纯数字格式 "1.2.3.5"；无法解析时兜底为 "1.0.0.0"。
-func toNumericVersion(version string) string {
+// getVersionComponents 解析语义化版本
+func getVersionComponents(version string) (major, minor, patch int, isStable bool) {
 	v := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if v == "" || v == "dev" {
-		v = "0.0.0"
+		return 0, 0, 0, false
 	}
-	m := numericVersionRe.FindStringSubmatch(v)
+	m := regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-(.+))?`).FindStringSubmatch(v)
 	if m == nil {
-		return "1.0.0.0"
+		return 1, 0, 0, true
 	}
-	build := m[4]
-	if build == "" {
-		build = "0"
-	}
-	return fmt.Sprintf("%s.%s.%s.%s", m[1], m[2], m[3], build)
+	major, _ = strconv.Atoi(m[1])
+	minor, _ = strconv.Atoi(m[2])
+	patch, _ = strconv.Atoi(m[3])
+	isStable = (m[4] == "")
+	return
 }
 
-// ── android-code（semver → Android versionCode，单个正整数）────────────────
-
-// toAndroidVersionCode 把版本号转换成 Android 要求的单个正整数 versionCode
-// （Play Store 上限约 21 亿，且必须单调递增）。复用 toNumericVersion 解析出
-// 的 major.minor.patch.build 四段，按
-//
-//	code = major*1_000_000 + minor*10_000 + patch*100 + build
-//
-// 编码成一个整数。这套编码在当前版本号规模下（各段基本不会超过两位数）
-// 长期安全，且天然随语义化版本号单调递增；无法解析时兜底为 1，
-// 避免生成 0 或负数触发 Google Play/系统的校验失败。
-func toAndroidVersionCode(version string) string {
-	numeric := toNumericVersion(version) // "major.minor.patch.build"
-	parts := strings.Split(numeric, ".")
-	nums := make([]int, 4)
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			n = 0
-		}
-		nums[i] = n
+// getBuildDays 直接使用构建时的系统时间计算距离 2024-01-01 的天数
+func getBuildDays() int {
+	days := int(time.Since(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)).Hours() / 24)
+	if days < 0 {
+		return 0
 	}
-	code := nums[0]*1_000_000 + nums[1]*10_000 + nums[2]*100 + nums[3]
+	return days
+}
+
+// ── numeric（semver → 4 段数字版本，供 Windows 资源版本号使用）──────────────
+func toNumericVersion(version string) string {
+	major, minor, patch, isStable := getVersionComponents(version)
+	build := getBuildDays()
+
+	if isStable {
+		build += 50000 // 正式版基础分 +50000，确保同日期的 v2.1.0 绝对大于 v2.1.0-rc.1
+	}
+	if build > 65535 {
+		build = 65535 // Windows 限制 build 号最大 65535
+	}
+	return fmt.Sprintf("%d.%d.%d.%d", major, minor, patch, build)
+}
+
+
+// android-code（semver → Android versionCode，单个正整数）
+// Android versionCode 上限约 21 亿。
+// 错位分配：大版本(最高20)1亿 + 小版本100万 + 修订号1万 + (Stable权重5000 + 距离天数)
+func toAndroidVersionCode(version string) string {
+	major, minor, patch, isStable := getVersionComponents(version)
+	days := getBuildDays()
+	if days > 4999 {
+		days = 4999 // 限制在 4999 天以内（约 13 年），防止溢出到高位
+	}
+
+	typeOffset := 0
+	if isStable {
+		typeOffset = 5000 // 正式版基础分 +5000，同理确保单调递增
+	}
+
+	code := major*100_000_000 + minor*1_000_000 + patch*10_000 + typeOffset + days
 	if code <= 0 {
 		code = 1
 	}
 	return strconv.Itoa(code)
 }
 
-// ── gen-syso（生成 Windows 版本资源 / manifest 临时文件）────────────────────
+// gen-syso（生成 Windows 版本资源 / manifest 临时文件）
 
 // assemblyIdentityRe 只替换目标程序自身的 assemblyIdentity version 属性，
 // 不影响其后的依赖项（如 Microsoft.Windows.Common-Controls）。
