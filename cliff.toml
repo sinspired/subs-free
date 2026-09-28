@@ -22,7 +22,7 @@ body = """
 
 ## 下载说明
 
-请选择正确的操作系统和架构：Android 手机选择 `.apk` 文件，部分深受国产厂商荼毒的设备，请选择 `ARMv8 Lite`；苹果 M 系列芯片设备请选择 `macOS/Apple Silicon`；Windows 安装版请选择 `Setup`，二进制直接选择 `EXE`
+`Android` 手机选择 `.apk`，旧手机选择 `ARMv8 Lite`；苹果 M 系选择 `macOS/Apple Silicon`；Windows 二进制选择 `EXE`，安装版选择 `Setup`
 
 ![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/sinspired/subs-free/{{ version }}/total?logo=github&label=当前版本下载次数&labelColor=black&color=red)
 
