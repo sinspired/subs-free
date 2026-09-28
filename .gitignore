@@ -22,3 +22,7 @@ build/android/.gradle/
 .idea/
 build/android/local.properties
 build/android/gradle/gradle-daemon-jvm.properties
+keystore_b64.txt
+release.keystore
+release-env.ps1
+release-env.sh

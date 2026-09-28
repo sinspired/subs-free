@@ -1,0 +1,1 @@
+keytool -genkey -v -keystore release.keystore -alias com.sinspired.subs_free -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=subs-free, OU=OpenSource, O=sinspired, L=Singapore, ST=Singapore, C=SG" -storepass 密码 -keypass 密码

@@ -184,6 +184,14 @@ jobs:
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
+          if [ -z "${ANDROID_KEYSTORE_B64}" ]; then
+            if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+              echo "::error::未配置 secrets.ANDROID_KEYSTORE_B64，拒绝用随机 debug 签名发布（会导致用户无法覆盖升级）"
+              exit 1
+            fi
+            echo "::warning::未配置 ANDROID_KEYSTORE_B64，本次手动构建将使用 debug 签名（仅供测试）"
+            exit 0
+          fi
           echo "${ANDROID_KEYSTORE_B64}" | base64 -d > "${RUNNER_TEMP}/release.keystore"
           echo "ANDROID_KEYSTORE_FILE=${RUNNER_TEMP}/release.keystore" >> "$GITHUB_ENV"
 
@@ -204,6 +212,24 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      # 打印每个 APK 的签名证书指纹，方便核对每个版本是否一致；
+      - name: Verify APK signing certificate
+        shell: bash
+        run: |
+          APKSIGNER=$(ls -1 "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)
+          for apk in bin/*.apk; do
+            echo "== ${apk}"
+            certs=$("${APKSIGNER}" verify --print-certs "${apk}")
+            echo "${certs}" | grep -E "certificate (DN|SHA-256 digest)"
+            if echo "${certs}" | grep -qi "Android Debug"; then
+              if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+                echo "::error::${apk} 使用了 debug 签名，中止发布"
+                exit 1
+              fi
+              echo "::warning::${apk} 使用 debug 签名（仅供测试）"
+            fi
+          done
 
       - name: Collect and Rename Artifacts
         shell: bash
