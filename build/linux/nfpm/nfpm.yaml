@@ -11,7 +11,7 @@ version: "0.1.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A subs-free application"
+description: "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
 vendor: "Sinspire Inc."
 homepage: "https://github.com/sinspired/subs-free"
 license: "MIT"

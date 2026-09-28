@@ -14,11 +14,11 @@
 		},
 		"0804": {
 			"FileDescription": "Subs Free 桌面端",
-			"Comments": "Subs Free 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
+			"Comments": "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
 		},
 		"0404": {
 			"FileDescription": "Subs Free 桌面端",
-			"Comments": "Subs Free 跨平台现代 GUI 桌面应用，适用于高性能代理管理、检测与订阅管理生成"
+			"Comments": "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
 		}
 	}
 }

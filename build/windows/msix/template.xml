@@ -14,12 +14,12 @@
         \subs-free">
     </Installer>
     <PackageInformation
-        PackageName="My Product"
-        PackageDisplayName="My Product"
+        PackageName="com.sinspired.subs_free"
+        PackageDisplayName="Subs Free"
         PublisherName="CN=Sinspire Inc."
         PublisherDisplayName="Sinspire Inc."
         Version="0.1.0.0"
-        PackageDescription="A subs-free application">
+        PackageDescription="基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。">
         <Capabilities>
             <Capability Name="runFullTrust" />
 
@@ -27,8 +27,8 @@
         <Applications>
             <Application
                 Id="com.sinspired.subs_free"
-                Description="A subs-free application"
-                DisplayName="My Product"
+                Description="基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
+                DisplayName="Subs Free"
                 ExecutableName="subs-free.exe"
                 EntryPoint="Windows.FullTrustApplication">
 
@@ -43,9 +43,9 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>My Product</DisplayName>
+            <DisplayName>Subs Free</DisplayName>
             <PublisherDisplayName>Sinspire Inc.</PublisherDisplayName>
-            <Description>A subs-free application</Description>
+            <Description>基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
