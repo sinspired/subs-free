@@ -22,6 +22,9 @@ var (
 )
 
 func main() {
+	// 初始化 Android 时区
+	initAndroidTimeZone()
+	
 	// 获取真实的 Android 沙盒路径，防止退化到 /data/local/tmp
 	workDir := utils.GetPrivateStorageDir()
 
