@@ -55,7 +55,7 @@ body = """
       <tr>
         <td>Windows</td>
         <td>
-          <a href="{{ base }}windows_x64-setup.exe"><img src="https://custom-icon-badges.demolab.com/badge/Setup-x64-2d7d9a.svg?logo=windows11"></a>
+          <a href="{{ base }}windows_x64_setup.exe"><img src="https://custom-icon-badges.demolab.com/badge/Setup-x64-2d7d9a.svg?logo=windows11"></a>
           <br>
           <a href="{{ base }}windows_x64.exe"><img src="https://custom-icon-badges.demolab.com/badge/Exe-x64-2d7d9a.svg?logo=windows11"></a>
         </td>
