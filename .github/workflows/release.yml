@@ -338,14 +338,14 @@ jobs:
         run: echo "CGO_ENABLED=1" >> $GITHUB_ENV
 
       # 2. Windows 原生 CGO 需要 GCC 编译器（安装 MinGW-w64）
-      - name: Install MinGW
+      - name: Install MinGW & UPX
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install mingw --no-progress -y
+          choco install mingw upx --no-progress -y
           $mingwPath = "C:\ProgramData\mingw64\mingw64\bin"
           echo "$mingwPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          Write-Host "✅ MinGW 已安装，路径: $mingwPath"
+          Write-Host "✅  UPX 已安装；MinGW 已安装，路径: $mingwPath"
 
       # Windows：NSIS 打包器（用于生成安装包）
       - name: Install NSIS
@@ -375,7 +375,7 @@ jobs:
         run: |
           sudo apt-get update
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
-            build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+            build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev upx-ucl
 
       - name: Install create-dmg (macOS)
         if: runner.os == 'macOS'
@@ -391,6 +391,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           task windows:build ARCH=${{ matrix.arch }}
+          upx --best bin/${{ env.APP_NAME }}.exe
           task windows:package ARCH=${{ matrix.arch }}
 
       - name: Build & Package (macOS)
@@ -403,6 +404,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           task linux:build ARCH=${{ matrix.arch }}
+          upx --best bin/${{ env.APP_NAME }}
           task linux:create:deb ARCH=${{ matrix.arch }} VERSION=${{ github.ref_name != '' && github.ref_name || 'dev' }}
 
       # 统一整理产物，重命名为规范格式
