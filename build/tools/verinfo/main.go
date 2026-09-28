@@ -16,6 +16,11 @@
 //
 //	CORE_VERSION / CORE_COMMIT   手动覆盖，跳过自动探测
 //	TASK_DEBUG=1                 打印调试信息到 stderr
+//
+// 版本号编码原则：结果【只由传入的版本字符串决定】，与构建时间、构建机器无关。
+// 这样同一个 tag 无论重跑多少次、arm64/amd64/lite 各变体在哪一天编译，
+// 产出的 versionCode 都完全一致，构建可复现；且 semver 的先后顺序
+// （alpha < beta < rc < 正式版）与数值大小严格一致，Android 才会允许覆盖升级。
 package main
 
 import (
@@ -27,7 +32,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const coreModule = "github.com/sinspired/subs-check-pro/v3"
@@ -111,6 +115,7 @@ func parseCoreVersion(goModPath string) (string, error) {
 	}
 	return m[1], nil
 }
+
 // core-version
 
 func coreVersion() string {
@@ -190,65 +195,104 @@ func coreCommit() string {
 	return hash
 }
 
-// numeric（semver → 4 段数字版本，供 Windows 资源版本号使用
+// semver 解析
 
-// getVersionComponents 解析语义化版本
-func getVersionComponents(version string) (major, minor, patch int, isStable bool) {
-	v := strings.TrimPrefix(strings.TrimSpace(version), "v")
-	if v == "" || v == "dev" {
-		return 0, 0, 0, false
-	}
-	m := regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-(.+))?`).FindStringSubmatch(v)
-	if m == nil {
-		return 1, 0, 0, true
-	}
-	major, _ = strconv.Atoi(m[1])
-	minor, _ = strconv.Atoi(m[2])
-	patch, _ = strconv.Atoi(m[3])
-	isStable = (m[4] == "")
-	return
+var (
+	semverRe     = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.\-]+))?(?:\+.*)?$`)
+	prereleaseRe = regexp.MustCompile(`^([A-Za-z]+)[.\-]?(\d*)`)
+)
+
+type semver struct {
+	major, minor, patch int
+	pre                 string // 预发布标识，如 "rc.1"；正式版为空
+	valid               bool   // false 表示 dev / 空 / 无法解析
 }
 
-// getBuildDays 直接使用构建时的系统时间计算距离 2024-01-01 的天数
-func getBuildDays() int {
-	days := int(time.Since(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)).Hours() / 24)
-	if days < 0 {
+func parseSemver(version string) semver {
+	v := strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if v == "" || v == "dev" {
+		return semver{}
+	}
+	m := semverRe.FindStringSubmatch(v)
+	if m == nil {
+		// 无法解析时直接报错，而不是悄悄当成 1.0.0：
+		// 否则 tag 写错会得到一个错误（且可能偏低）的 versionCode，用户就无法升级。
+		die("cannot parse version %q (expected vMAJOR.MINOR.PATCH[-prerelease])", version)
+	}
+	s := semver{valid: true, pre: m[4]}
+	s.major, _ = strconv.Atoi(m[1])
+	s.minor, _ = strconv.Atoi(m[2])
+	s.patch, _ = strconv.Atoi(m[3])
+	return s
+}
+
+// prereleaseTier 预发布类型的先后顺序：nightly < alpha < beta/preview < rc。
+func prereleaseTier(name string) int {
+	switch strings.ToLower(name) {
+	case "nightly":
+		return 1
+	case "alpha":
+		return 2
+	case "beta", "preview":
+		return 3
+	case "rc":
+		return 4
+	default:
 		return 0
 	}
-	return days
+}
+
+const (
+	// 稳定版在“发布阶段”这一段里的取值：必须大于任何预发布值（最大 4999），
+	// 同时也大于旧算法（5000 + 距 2024-01-01 的天数）在未来几年内可能产生的值，
+	// 保证已经安装了旧算法构建的用户仍可覆盖升级。
+	stageStable = 9000
+)
+
+// stageValue 返回 [0, 9999] 内的“发布阶段”值：预发布 = 类型*1000 + 序号(≤999)，正式版 = 9000。
+func (s semver) stageValue() int {
+	if s.pre == "" {
+		return stageStable
+	}
+	m := prereleaseRe.FindStringSubmatch(s.pre)
+	if m == nil {
+		return 0
+	}
+	n := 0
+	if m[2] != "" {
+		n, _ = strconv.Atoi(m[2])
+	}
+	return prereleaseTier(m[1])*1000 + min(n, 999)
 }
 
 // ── numeric（semver → 4 段数字版本，供 Windows 资源版本号使用）──────────────
+//
+// Windows 版本号每段最大 65535。第 4 段：预发布 = 阶段值(0~4999)，正式版固定 60000
+// （旧算法为 50000+天数，仍小于 60000，保证可覆盖升级）。
 func toNumericVersion(version string) string {
-	major, minor, patch, isStable := getVersionComponents(version)
-	build := getBuildDays()
-
-	if isStable {
-		build += 50000 // 正式版基础分 +50000，确保同日期的 v2.1.0 绝对大于 v2.1.0-rc.1
+	s := parseSemver(version)
+	build := s.stageValue()
+	if s.valid && s.pre == "" {
+		build = 60000
 	}
-	if build > 65535 {
-		build = 65535 // Windows 限制 build 号最大 65535
-	}
-	return fmt.Sprintf("%d.%d.%d.%d", major, minor, patch, build)
+	return fmt.Sprintf("%d.%d.%d.%d", s.major, s.minor, s.patch, build)
 }
 
-
 // android-code（semver → Android versionCode，单个正整数）
-// Android versionCode 上限约 21 亿。
-// 错位分配：大版本(最高20)1亿 + 小版本100万 + 修订号1万 + (Stable权重5000 + 距离天数)
+//
+// Android versionCode 上限 2_100_000_000。
+// 编码：major*1e8 + minor*1e6 + patch*1e4 + stage
+//
+//	major ≤ 20，minor ≤ 99，patch ≤ 99，stage ∈ [0, 9999]
+//
+// 任意两个不同版本，semver 大者 versionCode 必大；
+// 同一版本字符串在任何时间、任何机器上得到相同结果。
 func toAndroidVersionCode(version string) string {
-	major, minor, patch, isStable := getVersionComponents(version)
-	days := getBuildDays()
-	if days > 4999 {
-		days = 4999 // 限制在 4999 天以内（约 13 年），防止溢出到高位
+	s := parseSemver(version)
+	if s.major > 20 || s.minor > 99 || s.patch > 99 {
+		die("version %q out of range for android versionCode (major<=20, minor<=99, patch<=99)", version)
 	}
-
-	typeOffset := 0
-	if isStable {
-		typeOffset = 5000 // 正式版基础分 +5000，同理确保单调递增
-	}
-
-	code := major*100_000_000 + minor*1_000_000 + patch*10_000 + typeOffset + days
+	code := s.major*100_000_000 + s.minor*1_000_000 + s.patch*10_000 + s.stageValue()
 	if code <= 0 {
 		code = 1
 	}
