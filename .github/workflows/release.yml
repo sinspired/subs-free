@@ -391,7 +391,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           task windows:build ARCH=${{ matrix.arch }}
-          upx --best bin/${{ env.APP_NAME }}.exe
+          upx bin/${{ env.APP_NAME }}.exe
           task windows:package ARCH=${{ matrix.arch }}
 
       - name: Build & Package (macOS)
@@ -404,7 +404,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           task linux:build ARCH=${{ matrix.arch }}
-          upx --best bin/${{ env.APP_NAME }}
+          upx bin/${{ env.APP_NAME }}
           task linux:create:deb ARCH=${{ matrix.arch }} VERSION=${{ github.ref_name != '' && github.ref_name || 'dev' }}
 
       # 统一整理产物，重命名为规范格式
