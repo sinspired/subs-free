@@ -95,6 +95,8 @@ type UpdateInfo struct {
 	DownloadURL    string `json:"downloadURL"`
 	ApkNormalURL   string `json:"apkNormalUrl"` // 正常版直链
 	ApkLiteURL     string `json:"apkLiteUrl"`   // Lite版直链
+	ApkNormalSize  string `json:"apkNormalSize"`
+	ApkLiteSize    string `json:"apkLiteSize"`
 	PublishDate    string `json:"publishDate"`
 	Platform       string `json:"platform"`
 	Arch           string `json:"arch"`
@@ -267,7 +269,7 @@ func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
 	}
 
 	tagName := rel.TagName
-	if !strings.HasPrefix(tagName, "v") {
+	if tagName != "" && !strings.HasPrefix(tagName, "v") {
 		tagName = "v" + tagName
 	}
 
@@ -287,7 +289,13 @@ func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
 	targetURL := fmt.Sprintf("https://github.com/sinspired/subs-free/releases/tag/%s", tagName)
 
 	// 动态构建 Android 直链
-	var apkNormalURL, apkLiteURL string
+	var (
+		apkNormalURL  string
+		apkLiteURL    string
+		normalSizeStr string
+		liteSizeStr   string
+	)
+
 	if runtime.GOOS == "android" {
 		// 映射 Go 的架构到 Action 构建产物的架构
 		archName := runtime.GOARCH
@@ -300,20 +308,55 @@ func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
 			archName = "x86"
 		}
 
-		// 结合代理和 tag，拼接完整下载链接
-		baseDownloadURL := fmt.Sprintf("%shttps://github.com/sinspired/subs-free/releases/download/%s", guiupdater.GhProxyResolved, tagName)
-		apkNormalURL = fmt.Sprintf("%s/subs-free_%s.apk", baseDownloadURL, archName)
-		apkLiteURL = fmt.Sprintf("%s/subs-free_lite_%s.apk", baseDownloadURL, archName)
-	}
+		normalApkName := fmt.Sprintf(
+			"subs-free_%s.apk",
+			archName,
+		)
 
-	var sizeMB float64 = 0
-	for _, a := range rel.Assets {
-		if strings.HasSuffix(strings.ToLower(a.Name), ".apk") {
-			sizeMB = float64(a.Size) / (1024 * 1024)
-			break
+		liteApkName := fmt.Sprintf(
+			"subs-free_lite_%s.apk",
+			archName,
+		)
+
+		// 结合代理和 tag，拼接完整下载链接
+		baseDownloadURL := fmt.Sprintf(
+			"%shttps://github.com/sinspired/subs-free/releases/download/%s",
+			guiupdater.GhProxyResolved,
+			tagName,
+		)
+		apkNormalURL = fmt.Sprintf(
+			"%s/%s",
+			baseDownloadURL,
+			normalApkName,
+		)
+
+		apkLiteURL = fmt.Sprintf(
+			"%s/%s",
+			baseDownloadURL,
+			liteApkName,
+		)
+
+		for _, a := range rel.Assets {
+			switch a.Name {
+
+			case normalApkName:
+				normalSizeStr = fmt.Sprintf(
+					"%.2f MB",
+					float64(a.Size)/(1024*1024),
+				)
+
+			case liteApkName:
+				liteSizeStr = fmt.Sprintf(
+					"%.2f MB",
+					float64(a.Size)/(1024*1024),
+				)
+			}
+
+			if normalSizeStr != "" && liteSizeStr != "" {
+				break
+			}
 		}
 	}
-	sizeStr := fmt.Sprintf("%.2f MB", sizeMB)
 
 	pubDate := rel.PublishedAt
 	if len(pubDate) > 10 {
@@ -328,11 +371,13 @@ func (g *GuiApp) GetUpdateInfo() (info UpdateInfo) {
 		DownloadURL:    guiupdater.GhProxyResolved + targetURL,
 		ApkNormalURL:   apkNormalURL,
 		ApkLiteURL:     apkLiteURL,
+		ApkNormalSize:  normalSizeStr,
+		ApkLiteSize:    liteSizeStr,
 		PublishDate:    pubDate,
 		Platform:       runtime.GOOS,
 		Arch:           runtime.GOARCH,
 		Filetype:       "apk",
-		AssetSize:      sizeStr,
+		AssetSize:      normalSizeStr,
 	}
 }
 

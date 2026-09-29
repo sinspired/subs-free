@@ -68,6 +68,8 @@ export interface UpdateInfo {
      * Lite版直链
      */
     "apkLiteUrl": string;
+    "apkNormalSize": string;
+    "apkLiteSize": string;
     "publishDate": string;
     "platform": string;
     "arch": string;

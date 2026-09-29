@@ -65,6 +65,8 @@ interface UpdateInfo {
   downloadURL: string;
   apkNormalUrl?: string;
   apkLiteUrl?: string;
+  apkNormalSize?: string;
+  apkLiteSize?: string;
   error: string;
   publishDate: string;
   platform: string;
@@ -1258,10 +1260,10 @@ export function App() {
               )}
 
               {/* 通过 margin-left: auto 将 SIZE 推到最右*/}
-              {updateInfo?.assetSize && (
+              {updateInfo?.apkNormalSize && (
                 <div class="aw-update-meta-item" style={{ marginLeft: 'auto' }}>
                   <span class="aw-update-meta-label">SIZE</span>
-                  <span class="aw-update-meta-val">{updateInfo.assetSize}</span>
+                  <span class="aw-update-meta-val">{updateInfo.apkNormalSize}</span>
                 </div>
               )}
             </div>
