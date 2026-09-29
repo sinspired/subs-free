@@ -262,7 +262,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 
 /* 订阅列表：实心卡片 */
 .sheet-list { display: flex; flex-direction: column; max-height: 50vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); gap: 6px}
-.list-item { display: flex; align-items: center; padding: 0 18px; background: transparent; border: 1px solid var(--border-glass); border-radius: 24px; cursor: pointer; transition: all 0.5s; box-shadow: 0 4px 12px var(--shadow-bg)}
+.list-item { display: flex; align-items: center; padding: 0 18px; gap:8px; background: transparent; border: 1px solid var(--border-glass); border-radius: 24px; cursor: pointer; transition: all 0.5s; box-shadow: 0 4px 12px var(--shadow-bg)}
 .list-item:active { background: var(--code-bg); transform: scale(0.98); }
 .list-item .link-icon { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
 /* 动态适应深浅色：针对 svg */
