@@ -38,6 +38,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
+            android:windowSoftInputMode="stateHidden|adjustPan"
             android:label="@string/app_name"
             android:theme="@style/Theme.SubsFree.NoActionBar">
             <intent-filter>
