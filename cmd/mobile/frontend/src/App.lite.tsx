@@ -1013,8 +1013,8 @@ export function App() {
             <div class="info-group">
               <div class="label">服务</div>
               <div class="port-badges">
-                <span class="port-badge"><span class="port-dot"></span> HTTP <span class="val">{info?.listenPort}</span></span>
-                {info?.subStorePort && <span class="port-badge"><span class="port-dot"></span> Sub <span class="val">{info.subStorePort}</span></span>}
+                <span class="port-badge"><span class="port-dot"></span>Web<span class="val">{info?.listenPort}</span></span>
+                {info?.subStorePort && <span class="port-badge"><span class="port-dot"></span>Sub<span class="val">{info.subStorePort}</span></span>}
               </div>
             </div>
             <div class="info-group">
