@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Subs Free</string>
     <string name="welcome_message">欢迎使用 Subs Free APP</string>
@@ -6,3 +7,4 @@
     <string name="about_title">关于 Subs Free APP</string>
     <string name="version_label">版本</string>
 </resources>
+

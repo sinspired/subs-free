@@ -20,12 +20,12 @@ Unicode true
 ## The following information is taken from the wails_tools.nsh file, but they can be overwritten here.
 ####
 ## !define INFO_PROJECTNAME    "subs-free" # Default "subs-free"
-## !define INFO_COMPANYNAME    "Sinspired" # Default "Sinspire Inc."
-## !define INFO_PRODUCTNAME    "Subs Free" # Default "Subs Free"
+## !define INFO_COMPANYNAME    "Sinspired" # Default "Sinspired"
+## !define INFO_PRODUCTNAME    "Subs Free" # Default "My Product"
 ## !define INFO_PRODUCTVERSION "1.0.0"     # Default "0.1.0"
-## !define INFO_COPYRIGHT      "(c) Now, My Company" # Default "© 2026, Sinspire Inc."
+## !define INFO_COPYRIGHT      "© 2026, Sinspired" # Default "© 2026, Sinspired"
 ###
-## !define PRODUCT_EXECUTABLE  "Application.exe"      # Default "${INFO_PROJECTNAME}.exe"
+## !define PRODUCT_EXECUTABLE  "subs-free.exe"      # Default "${INFO_PROJECTNAME}.exe"
 ## !define UNINST_KEY_NAME     "UninstKeyInRegistry"  # Default "${INFO_COMPANYNAME}${INFO_PRODUCTNAME}"
 ####
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html

@@ -10,14 +10,13 @@
     <Installer
         Path="subs-free.exe"
         Arguments=""
-        InstallLocation="C:\Program Files\Sinspired
-        \subs-free">
+        InstallLocation="C:\Program Files\Sinspired\Subs Free">
     </Installer>
     <PackageInformation
-        PackageName="com.sinspired.subs_free"
+        PackageName="Subs Free"
         PackageDisplayName="Subs Free"
-        PublisherName="CN=Sinspire Inc."
-        PublisherDisplayName="Sinspire Inc."
+        PublisherName="CN=Sinspired"
+        PublisherDisplayName="Sinspired"
         Version="0.1.0.0"
         PackageDescription="基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。">
         <Capabilities>
@@ -26,7 +25,7 @@
         </Capabilities>
         <Applications>
             <Application
-                Id="com.sinspired.subs_free"
+                Id="com.sinspired.subsfree"
                 Description="基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
                 DisplayName="Subs Free"
                 ExecutableName="subs-free.exe"
@@ -38,13 +37,12 @@
             <Resource Language="en-us" />
         </Resources>
         <Dependencies>
-            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0"
-                MaxVersionTested="10.0.19041.0" />
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
             <DisplayName>Subs Free</DisplayName>
-            <PublisherDisplayName>Sinspire Inc.</PublisherDisplayName>
+            <PublisherDisplayName>Sinspired</PublisherDisplayName>
             <Description>基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>

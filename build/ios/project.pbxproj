@@ -65,7 +65,7 @@
 				C0DEBEEF0000000000000104 /* Security.framework */,
 				C0DEBEEF0000000000000105 /* CoreFoundation.framework */,
 				C0DEBEEF0000000000000106 /* libresolv.tbd */,
-				C0DEBEEF0000000000000107 /* Subs Freet.a */,
+				C0DEBEEF0000000000000107 /* Subs Free.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -97,7 +97,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 1500;
-				ORGANIZATIONNAME = "Sinspire Inc.";
+				ORGANIZATIONNAME = "Sinspired";
 				TargetAttributes = {
 					C0DEBEEF0000000000000040 = {
 						CreatedOnToolsVersion = 15.0;

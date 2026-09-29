@@ -8,7 +8,7 @@
     !define INFO_PROJECTNAME "subs-free"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "Sinspire Inc."
+    !define INFO_COMPANYNAME "Sinspired"
 !endif
 !ifndef INFO_PRODUCTNAME
     !define INFO_PRODUCTNAME "Subs Free"
@@ -17,7 +17,7 @@
     !define INFO_PRODUCTVERSION "0.1.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "© 2026, Sinspire Inc."
+    !define INFO_COPYRIGHT "© 2026, Sinspired"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"

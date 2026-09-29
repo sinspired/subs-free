@@ -8,8 +8,8 @@
   IgnorableNamespaces="uap3">
 
   <Identity
-    Name="com.sinspired.subs_free"
-    Publisher="CN=Sinspire Inc."
+    Name="com.sinspired.subsfree"
+    Publisher="CN=Sinspired"
     Version="0.1.0.0"
     ProcessorArchitecture="x64" />
 
@@ -21,8 +21,7 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0"
-      MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
   <Resources>
@@ -30,8 +29,7 @@
   </Resources>
 
   <Applications>
-    <Application Id="com.sinspired.subs_free" Executable="subs-free.exe"
-      EntryPoint="Windows.FullTrustApplication">
+    <Application Id="com.sinspired.subsfree" Executable="subs-free.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="Subs Free"
         Description="基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"

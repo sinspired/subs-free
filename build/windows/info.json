@@ -4,13 +4,14 @@
 	},
 	"info": {
 		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Sinspired",
+			"FileDescription": "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。",
+			"LegalCopyright": "© 2026, Sinspired",
+			"LegalTrademarks": "sinspired",
 			"ProductName": "Subs Free",
-			"ProductVersion": "1.0.0-alpha.97",
-			"CompanyName": "sinspired",
-			"InternalName": "subs-free",
 			"OriginalFilename": "subs-free.exe",
-			"LegalCopyright": "(c) 2026 sinspired",
-			"LegalTrademarks": "sinspired"
+			"Comments": "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。"
 		},
 		"0804": {
 			"FileDescription": "Subs Free 桌面端",

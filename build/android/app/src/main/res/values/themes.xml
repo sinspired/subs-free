@@ -1,7 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <!-- 主主题 (浅色模式) -->
-    <style name="Theme.subs_free" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.SinspiredAPP" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
@@ -27,7 +26,7 @@
     </style>
 
     <!-- 夜间模式覆盖 -->
-    <style name="Theme.subs_free.Dark" parent="Theme.subs_free">
+    <style name="Theme.SinspiredAPP.Dark" parent="Theme.SinspiredAPP">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
 
@@ -38,5 +37,4 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
-
 </resources>

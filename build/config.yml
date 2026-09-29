@@ -5,17 +5,17 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "sinspired" # The name of the company
-  productName: "subs-free" # The name of the application
+  companyName: "Sinspired" # The name of the company
+  productName: "Subs Free" # The name of the application
   productIdentifier: "com.sinspired.subs_free" # The unique product identifier
   description: "基于 Subs-Check-Pro 内核的跨平台客户端应用，支持 Android 手机，Windows，Linux和Mac。" # The application description
-  copyright: "(c) 2025, sinspired" # Copyright text
+  copyright: "(c) 2025, Sinspired" # Copyright text
   comments: "跨平台现代 GUI 客户端，基于 Subs Check PRO v3内核，本地原生界面 + WebUI，可远程管理，后台运行，支持开机自启。" # Comments
   version: "1.0.0" # The application version
+  # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
+  #                               # Should match the name of your .icon file without the extension
+  #                               # If not set and Assets.car exists, defaults to "appicon"
 
-# cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
-#                               # Should match the name of your .icon file without the extension
-#                               # If not set and Assets.car exists, defaults to "appicon"
 # iOS build configuration (uncomment to customise iOS project generation)
 # Note: Keys under `ios` OVERRIDE values under `info` when set.
 # ios:
@@ -26,7 +26,7 @@ info:
 #   # The app version to embed in Info.plist (CFBundleShortVersionString/CFBundleVersion)
 #   version: "0.0.1"
 #   # The company/organisation name for templates and project settings
-#   company: "My Company"
+#   company: "Sinspired"
 #   # Additional comments to embed in Info.plist metadata
 #   comments: "Some Product Comments"
 
@@ -56,8 +56,16 @@ dev_mode:
       type: blocking
     - cmd: wails3 task common:dev:frontend
       type: background
+      # The standard frontend task waits up to 60s for HTTP 200 from
+      # FRONTEND_DEVSERVER_URL before starting the app. Override if needed;
+      # custom background commands can opt in with the same readiness block.
+      # readiness:
+      #   http: "http://localhost:5173/"
+      #   timeout: "60s"
+      #   interval: "200ms"
     - cmd: wails3 task run
       type: primary
+      exit_policy: shutdown
 
 # File Associations
 # More information at: https://v3.wails.io/noit/done/yet
