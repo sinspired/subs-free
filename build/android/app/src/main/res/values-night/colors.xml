@@ -1,0 +1,18 @@
+<resources>
+
+    <color name="primary">#0EA5A0</color>
+    <color name="primary_dark">#0C7A76</color>
+    <color name="accent">#FF9800</color>
+
+    <color name="bg">#111317</color>
+    <color name="card">#1C1E23</color>
+
+    <color name="text_main">#E5E7EB</color>
+    <color name="text_sub">#9CA3AF</color>
+
+    <color name="launcher_bg">#111317</color>
+
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+</resources>

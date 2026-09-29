@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SinspiredAPP"
+rootProject.name = "Subs Free"
 include ':app'
