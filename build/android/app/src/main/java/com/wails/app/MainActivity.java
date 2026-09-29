@@ -29,7 +29,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.annotation.Nullable;
-import android.view.View;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
@@ -149,8 +148,7 @@ public class MainActivity extends AppCompatActivity {
                         if (query != null && !query.isEmpty()) {
                             fullPath = path + "?" + query;
                         }
-                        if (DEBUG)
-                            Log.d(TAG, "Wails API call: " + fullPath);
+                        if (DEBUG) Log.d(TAG, "Wails API call: " + fullPath);
 
                         byte[] data = bridge.serveAsset(fullPath, request.getMethod(), "{}");
                         if (data != null && data.length > 0) {
@@ -161,21 +159,23 @@ public class MainActivity extends AppCompatActivity {
                             headers.put("Content-Type", "application/json");
 
                             return new WebResourceResponse(
-                                    "application/json",
-                                    "UTF-8",
-                                    200,
-                                    "OK",
-                                    headers,
-                                    inputStream);
+                                "application/json",
+                                "UTF-8",
+                                200,
+                                "OK",
+                                headers,
+                                inputStream
+                            );
                         }
                         // Return error response if data is null
                         return new WebResourceResponse(
-                                "application/json",
-                                "UTF-8",
-                                500,
-                                "Internal Error",
-                                new java.util.HashMap<>(),
-                                new java.io.ByteArrayInputStream("{}".getBytes()));
+                            "application/json",
+                            "UTF-8",
+                            500,
+                            "Internal Error",
+                            new java.util.HashMap<>(),
+                            new java.io.ByteArrayInputStream("{}".getBytes())
+                        );
                     }
 
                     // Stream captured photos/videos from the cache with HTTP Range
@@ -219,8 +219,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (DEBUG)
-                    Log.d(TAG, "Page loaded: " + url);
+                if (DEBUG) Log.d(TAG, "Page loaded: " + url);
                 bridge.onPageFinished(url);
                 // Now that JS listeners are mounted, push a snapshot of the
                 // current battery / network / theme so the UI starts populated.
@@ -234,8 +233,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadApplication() {
         String url = WAILS_SCHEME + "://" + WAILS_HOST + "/";
-        if (DEBUG)
-            Log.d(TAG, "Loading URL: " + url);
+        if (DEBUG) Log.d(TAG, "Loading URL: " + url);
         webView.loadUrl(url);
     }
 
@@ -247,13 +245,12 @@ public class MainActivity extends AppCompatActivity {
     public void launchCameraCapture(boolean video) {
         if (checkSelfPermission("android.permission.CAMERA") != PackageManager.PERMISSION_GRANTED) {
             pendingCaptureIsVideo = video;
-            requestPermissions(new String[] { "android.permission.CAMERA" }, CAMERA_PERMISSION_REQUEST);
+            requestPermissions(new String[]{"android.permission.CAMERA"}, CAMERA_PERMISSION_REQUEST);
             return;
         }
         try {
             File dir = new File(getCacheDir(), "captures");
-            if (!dir.exists())
-                dir.mkdirs();
+            if (!dir.exists()) dir.mkdirs();
             pendingCaptureFile = new File(dir, "capture_" + System.currentTimeMillis() + (video ? ".mp4" : ".jpg"));
             pendingCaptureIsVideo = video;
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", pendingCaptureFile);
@@ -301,8 +298,7 @@ public class MainActivity extends AppCompatActivity {
         if ((file == null || !file.exists() || file.length() == 0)
                 && data != null && data.getData() != null) {
             String copied = copyUriToCache(data.getData());
-            if (copied != null)
-                file = new File(copied);
+            if (copied != null) file = new File(copied);
         }
         final File f = file;
         if (f == null || !f.exists() || f.length() == 0) {
@@ -317,8 +313,7 @@ public class MainActivity extends AppCompatActivity {
                 o.put("size", f.length());
                 if (!video) {
                     String thumb = makePhotoThumbnail(f);
-                    if (thumb != null)
-                        o.put("thumb", thumb);
+                    if (thumb != null) o.put("thumb", thumb);
                 }
                 // Stream URL works for both: <video>/<img> load it from the cache
                 // via shouldInterceptRequest (Range-enabled), no size limit.
@@ -331,10 +326,7 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    /**
-     * Downscale a captured photo into a base64 JPEG data URL for display in the
-     * webview.
-     */
+    /** Downscale a captured photo into a base64 JPEG data URL for display in the webview. */
     @Nullable
     private String makePhotoThumbnail(File file) {
         try {
@@ -342,13 +334,11 @@ public class MainActivity extends AppCompatActivity {
             bounds.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
             int sample = 1;
-            while (Math.max(bounds.outWidth, bounds.outHeight) / sample > 640)
-                sample *= 2;
+            while (Math.max(bounds.outWidth, bounds.outHeight) / sample > 640) sample *= 2;
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inSampleSize = sample;
             Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
-            if (bmp == null)
-                return null;
+            if (bmp == null) return null;
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             bmp.compress(Bitmap.CompressFormat.JPEG, 70, baos);
             bmp.recycle();
@@ -389,13 +379,12 @@ public class MainActivity extends AppCompatActivity {
             String name = file.getName().toLowerCase();
             String mime = name.endsWith(".mp4") ? "video/mp4"
                     : name.endsWith(".mov") ? "video/quicktime"
-                            : name.endsWith(".jpg") || name.endsWith(".jpeg") ? "image/jpeg"
-                                    : name.endsWith(".png") ? "image/png" : "application/octet-stream";
+                    : name.endsWith(".jpg") || name.endsWith(".jpeg") ? "image/jpeg"
+                    : name.endsWith(".png") ? "image/png" : "application/octet-stream";
             long length = file.length();
             java.util.Map<String, String> reqHeaders = request.getRequestHeaders();
             String range = reqHeaders != null ? reqHeaders.get("Range") : null;
-            if (range == null && reqHeaders != null)
-                range = reqHeaders.get("range");
+            if (range == null && reqHeaders != null) range = reqHeaders.get("range");
 
             java.util.Map<String, String> headers = new java.util.HashMap<>();
             headers.put("Accept-Ranges", "bytes");
@@ -407,29 +396,20 @@ public class MainActivity extends AppCompatActivity {
                 int dash = spec.indexOf('-');
                 if (dash >= 0) {
                     try {
-                        if (dash > 0)
-                            start = Long.parseLong(spec.substring(0, dash).trim());
+                        if (dash > 0) start = Long.parseLong(spec.substring(0, dash).trim());
                         String e = spec.substring(dash + 1).trim();
-                        if (!e.isEmpty())
-                            end = Long.parseLong(e);
-                    } catch (NumberFormatException ignored) {
-                    }
+                        if (!e.isEmpty()) end = Long.parseLong(e);
+                    } catch (NumberFormatException ignored) { }
                 }
-                if (start < 0)
-                    start = 0;
-                if (end >= length)
-                    end = length - 1;
-                if (start > end) {
-                    start = 0;
-                    end = length - 1;
-                }
+                if (start < 0) start = 0;
+                if (end >= length) end = length - 1;
+                if (start > end) { start = 0; end = length - 1; }
                 long count = end - start + 1;
                 java.io.InputStream in = new java.io.FileInputStream(file);
                 long toSkip = start;
                 while (toSkip > 0) {
                     long s = in.skip(toSkip);
-                    if (s <= 0)
-                        break;
+                    if (s <= 0) break;
                     toSkip -= s;
                 }
                 headers.put("Content-Range", "bytes " + start + "-" + end + "/" + length);
@@ -447,35 +427,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Wraps a stream to yield at most a fixed number of bytes (for Range
-     * responses).
-     */
+    /** Wraps a stream to yield at most a fixed number of bytes (for Range responses). */
     private static final class LimitedInputStream extends java.io.FilterInputStream {
         private long remaining;
-
         LimitedInputStream(java.io.InputStream in, long limit) {
             super(in);
             this.remaining = limit;
         }
-
-        @Override
-        public int read() throws java.io.IOException {
-            if (remaining <= 0)
-                return -1;
+        @Override public int read() throws java.io.IOException {
+            if (remaining <= 0) return -1;
             int b = super.read();
-            if (b >= 0)
-                remaining--;
+            if (b >= 0) remaining--;
             return b;
         }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws java.io.IOException {
-            if (remaining <= 0)
-                return -1;
+        @Override public int read(byte[] b, int off, int len) throws java.io.IOException {
+            if (remaining <= 0) return -1;
             int n = super.read(b, off, (int) Math.min(len, remaining));
-            if (n > 0)
-                remaining -= n;
+            if (n > 0) remaining -= n;
             return n;
         }
     }
@@ -570,7 +538,7 @@ public class MainActivity extends AppCompatActivity {
             }
             File out = new File(dir, name);
             try (InputStream in = getContentResolver().openInputStream(uri);
-                    OutputStream os = new FileOutputStream(out)) {
+                 OutputStream os = new FileOutputStream(out)) {
                 if (in == null) {
                     return null;
                 }
@@ -608,8 +576,7 @@ public class MainActivity extends AppCompatActivity {
         // Battery + charging state (sticky broadcast: the current value is
         // delivered to the receiver immediately on registration).
         batteryReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
+            @Override public void onReceive(Context context, Intent intent) {
                 emitBattery(intent);
             }
         };
@@ -617,8 +584,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Low-power (battery saver) mode toggles → re-emit battery with the flag.
         powerSaveReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
+            @Override public void onReceive(Context context, Intent intent) {
                 emitBattery(registerSticky(Intent.ACTION_BATTERY_CHANGED));
             }
         };
@@ -627,8 +593,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Screen lock / unlock. SCREEN_OFF ≈ locked; USER_PRESENT = unlocked.
         screenReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
+            @Override public void onReceive(Context context, Intent intent) {
                 String action = intent.getAction();
                 if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                     emitLock(true);
@@ -646,18 +611,9 @@ public class MainActivity extends AppCompatActivity {
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (connectivityManager != null) {
             networkCallback = new ConnectivityManager.NetworkCallback() {
-                @Override
-                public void onAvailable(Network network) {
-                    emitNetwork(network);
-                }
-
-                @Override
-                public void onLost(Network network) {
-                    emitNetworkDisconnected();
-                }
-
-                @Override
-                public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+                @Override public void onAvailable(Network network) { emitNetwork(network); }
+                @Override public void onLost(Network network) { emitNetworkDisconnected(); }
+                @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
                     emitNetwork(network);
                 }
             };
@@ -700,9 +656,7 @@ public class MainActivity extends AppCompatActivity {
         return registerReceiver(null, new IntentFilter(action));
     }
 
-    /**
-     * Push current battery / network / theme so a freshly-loaded UI is populated.
-     */
+    /** Push current battery / network / theme so a freshly-loaded UI is populated. */
     private void emitSystemSnapshot() {
         emitBattery(registerSticky(Intent.ACTION_BATTERY_CHANGED));
         if (connectivityManager != null) {
@@ -727,19 +681,11 @@ public class MainActivity extends AppCompatActivity {
                     level = lvl / (float) scale;
                 }
                 switch (batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
-                    case BatteryManager.BATTERY_STATUS_CHARGING:
-                        state = "charging";
-                        break;
-                    case BatteryManager.BATTERY_STATUS_FULL:
-                        state = "full";
-                        break;
+                    case BatteryManager.BATTERY_STATUS_CHARGING: state = "charging"; break;
+                    case BatteryManager.BATTERY_STATUS_FULL: state = "full"; break;
                     case BatteryManager.BATTERY_STATUS_DISCHARGING:
-                    case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
-                        state = "unplugged";
-                        break;
-                    default:
-                        state = "unknown";
-                        break;
+                    case BatteryManager.BATTERY_STATUS_NOT_CHARGING: state = "unplugged"; break;
+                    default: state = "unknown"; break;
                 }
             }
             boolean lowPower = false;
@@ -751,8 +697,7 @@ public class MainActivity extends AppCompatActivity {
             o.put("level", (double) level);
             o.put("state", state);
             o.put("lowPowerMode", lowPower);
-            if (bridge != null)
-                bridge.emitSystemEvent("android:BatteryChanged", o.toString());
+            if (bridge != null) bridge.emitSystemEvent("android:BatteryChanged", o.toString());
         } catch (Exception e) {
             Log.e(TAG, "emitBattery failed", e);
         }
@@ -793,8 +738,7 @@ public class MainActivity extends AppCompatActivity {
             if (signal != null) {
                 o.put("signal", (int) signal);
             }
-            if (bridge != null)
-                bridge.emitSystemEvent("android:NetworkChanged", o.toString());
+            if (bridge != null) bridge.emitSystemEvent("android:NetworkChanged", o.toString());
         } catch (Exception e) {
             Log.e(TAG, "emitNetwork failed", e);
         }
@@ -806,8 +750,7 @@ public class MainActivity extends AppCompatActivity {
             o.put("connected", false);
             o.put("type", "none");
             o.put("metered", false);
-            if (bridge != null)
-                bridge.emitSystemEvent("android:NetworkChanged", o.toString());
+            if (bridge != null) bridge.emitSystemEvent("android:NetworkChanged", o.toString());
         } catch (Exception ignored) {
         }
     }
@@ -825,8 +768,7 @@ public class MainActivity extends AppCompatActivity {
             JSONObject o = new JSONObject();
             // "isDarkMode" matches the context key the desktop platforms use.
             o.put("isDarkMode", mode == Configuration.UI_MODE_NIGHT_YES);
-            if (bridge != null)
-                bridge.emitSystemEvent("android:ThemeChanged", o.toString());
+            if (bridge != null) bridge.emitSystemEvent("android:ThemeChanged", o.toString());
         } catch (Exception ignored) {
         }
     }
