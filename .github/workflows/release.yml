@@ -390,41 +390,33 @@ jobs:
       - name: Build & Package (Windows)
         if: runner.os == 'Windows'
         run: |
+          # 先执行打包任务 (添加 setup 标记)
+          task windows:package ARCH=${{ matrix.arch }}
+
+          # 单独编译二进制并压缩
           task windows:build ARCH=${{ matrix.arch }}
           upx bin/${{ env.APP_NAME }}.exe
-          task windows:package ARCH=${{ matrix.arch }}
 
       - name: Build & Package (macOS)
         if: runner.os == 'macOS'
         run: |
+          # 1. 先执行打包任务 (带 setup 标签，生成 .app)
           task darwin:package ARCH=${{ matrix.arch }}
+
+          # 2. 从 .app 生成 .dmg 安装包
           task darwin:create:dmg ARCH=${{ matrix.arch }}
+
+          # 3. 重新单独编译一次纯净的二进制 (不带 setup 标签)
+          task darwin:build ARCH=${{ matrix.arch }}
 
       - name: Build & Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          # 1. 动态生成 go 包装器，拦截 `go build`
-          # 在原生编译生成二进制后立即调用 upx，防止 task 发现文件被篡改而触发二次编译覆盖
-          mkdir -p .go-wrapper
-          REAL_GO=$(which go)
-          cat << EOF > .go-wrapper/go
-          #!/bin/bash
-          "\$REAL_GO" "\$@"
-          EXIT_CODE=\$?
-
-          # 判断如果是主程序的构建命令，则自动执行压缩
-          if [ \$EXIT_CODE -eq 0 ] && [[ " \$* " == *" -o bin/${{ env.APP_NAME }} "* ]]; then
-            echo "🚀 Auto-running UPX on bin/${{ env.APP_NAME }}..."
-            upx bin/${{ env.APP_NAME }}
-          fi
-          exit \$EXIT_CODE
-          EOF
-
-          chmod +x .go-wrapper/go
-          export PATH="$PWD/.go-wrapper:$PATH"
-
-          # 2. 仅调用 package 命令，它在触发构建依赖时会自动被 wrapper 代理并压缩，最后完成 .deb 打包
-          task linux:create:deb ARCH=${{ matrix.arch }} VERSION=${{ github.ref_name != '' && github.ref_name || 'dev' }}
+          # 1. 先执行打包任务 (带 setup 标签)
+          task linux:package ARCH=${{ matrix.arch }}
+          # 重新单独编译一次纯净的二进制 (不带 setup 标签)
+          task linux:build ARCH=${{ matrix.arch }}
+          upx bin/${{ env.APP_NAME }}
 
       # 统一整理产物，重命名为规范格式
       - name: Collect and Rename Artifacts
