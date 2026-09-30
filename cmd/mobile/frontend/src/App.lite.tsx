@@ -217,24 +217,6 @@ export function App() {
     document.documentElement.setAttribute("data-theme", initialTheme);
     // 同步一次系统状态栏外观
     GuiApp.SetStatusBarAppearance(initialTheme === "dark");
-    // 动态获取安全区
-    const applySafeArea = async () => {
-      try {
-        const sa = await GuiApp.GetSafeArea();
-        if (sa) {
-          // 写入 CSS 变量，单位为 px
-          document.documentElement.style.setProperty("--sa-top", `${sa.top}px`);
-          document.documentElement.style.setProperty("--sa-bottom", `${sa.bottom}px`);
-          document.documentElement.style.setProperty("--sa-left", `${sa.left}px`);
-          document.documentElement.style.setProperty("--sa-right", `${sa.right}px`);
-        }
-      } catch (e) {
-        console.warn("读取原生安全区失败:", e);
-      }
-    };
-    applySafeArea();
-    // 监听窗口大小变化（如手机横竖屏旋转）实时重新获取
-    window.addEventListener("resize", applySafeArea);
 
     initApp();
     const interval = setInterval(pollStatus, 1000);
@@ -250,7 +232,6 @@ export function App() {
     return () => {
       clearInterval(interval);
       window.clearTimeout(initTimerRef.current);
-      window.removeEventListener("resize", applySafeArea);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);

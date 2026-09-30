@@ -1,5 +1,23 @@
 /* cmd\mobile\frontend\src\style.css */
 :root {
+  /* 1. 给旧设备的保底安全值，确保 var() 解析后绝对合法 */
+  --sa-top: 0px;
+  --sa-bottom: 0px;
+  --sa-left: 0px;
+  --sa-right: 0px;
+}
+
+/* 2. 只有真正支持 env() 的现代设备，才去覆盖这些变量 */
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --sa-top: env(safe-area-inset-top, 0px);
+    --sa-bottom: env(safe-area-inset-bottom, 0px);
+    --sa-left: env(safe-area-inset-left, 0px);
+    --sa-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+:root {
   /* 品牌色体系 */
   --primary: #0ea5a0;
   --primary-dark: #0c7a76;
@@ -65,6 +83,8 @@
 
 *:focus { outline: none !important; }
 
+html {overflow-x: hidden; overflow-y: hidden;}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background-color: var(--bg); color: var(--text-main);
@@ -86,12 +106,13 @@ body {
   flex-direction: column;
   height: 100vh;
   height: 100lvh;
+  overflow-x: hidden;
   overflow-y: auto;
   /* Respect the iOS safe area (notch, home indicator) */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-top: var(--sa-top);
+  padding-bottom: var(--sa-bottom);
+  padding-left: var(--sa-left);
+  padding-right: var(--sa-right);
 }
 
 .flex-center { justify-content: center; align-items: center; text-align: center; }
@@ -261,7 +282,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .sheet-desc { font-size: 13px; color: var(--text-sub); text-align: center; margin-bottom: 20px; }
 
 /* 订阅列表：实心卡片 */
-.sheet-list { display: flex; flex-direction: column; max-height: 50vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); gap: 6px}
+.sheet-list { display: flex; flex-direction: column; max-height: 50vh; overflow-y: auto; padding-bottom: var(--sa-bottom); gap: 6px}
 .list-item { display: flex; align-items: center; padding: 0 18px; gap:8px; background: transparent; border: 1px solid var(--border-glass); border-radius: 24px; cursor: pointer; transition: all 0.5s; box-shadow: 0 4px 12px var(--shadow-bg)}
 .list-item:active { background: var(--code-bg); transform: scale(0.98); }
 .list-item .link-icon { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
@@ -304,7 +325,7 @@ img.link-icon {filter: invert(var(--invert));}
 .toast.show {
   /* Toast 动画高度适配 */
   top: 4px;
-  transform: translate(-50%, env(safe-area-inset-top, 0px)) scale(1);
+  transform: translate(-50%, var(--sa-top)) scale(1);
   opacity: 1;
 }
 
@@ -420,7 +441,7 @@ img.link-icon {filter: invert(var(--invert));}
 
 .aw-link-arrow {stroke-width:2; width: 16px; height: 16px; flex-shrink: 0; color: var(--text-sub); opacity: 0.5; transform: translateX(0); transition: all 0.25s; }
 .aw-link-card:active .aw-link-arrow { opacity: 0.9; transform: translateX(4px); color: var(--text-main); }
-.about-footer-copyright { text-align: center; margin-top: 24px; font-size: 10px; color: var(--text-sub); opacity: 0.7; letter-spacing: 0.5px;  padding-bottom: env(safe-area-inset-bottom);}
+.about-footer-copyright { text-align: center; margin-top: 24px; font-size: 10px; color: var(--text-sub); opacity: 0.7; letter-spacing: 0.5px;  padding-bottom: var(--sa-bottom);}
 
 /* ── 自定义确认弹窗 (Modal) ── */
 .modal-overlay {
@@ -429,8 +450,8 @@ img.link-icon {filter: invert(var(--invert));}
   z-index: 1200; opacity: 0; pointer-events: none;
   transition: opacity 0.4s ease;
   display: flex; align-items: center; justify-content: center;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: var(--sa-top);
+  padding-bottom: var(--sa-bottom);
   padding-left: 12px;
   padding-right: 12px;
 }
@@ -612,10 +633,10 @@ img.link-icon {filter: invert(var(--invert));}
   position: fixed; inset: 0; z-index: 2000;
   background: var(--bg);
   display: flex; flex-direction: column;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-top: var(--sa-top);
+  padding-bottom: var(--sa-bottom);
+  padding-left: var(--sa-left);
+  padding-right: var(--sa-right);
   animation: slide-up 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes slide-up {
