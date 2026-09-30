@@ -114,11 +114,11 @@ tasks:
     cmds:
       - task: '{{if eq (.FORMAT | default "nsis") "msix"}}create:msix:package{{else}}create:nsis:installer{{end}}'
         vars:
-          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
           GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
     vars:
       FORMAT: '{{.FORMAT | default "nsis"}}'
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
       GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
 
   # generate:syso — 生成 Windows .syso（PE 版本资源 + 清单）
@@ -153,6 +153,8 @@ tasks:
       - task: build
         vars:
           GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
+          # 注入 setup tag。如果已有其他 tags 则追加。
+          EXTRA_TAGS: '{{if .EXTRA_TAGS}}{{.EXTRA_TAGS}},setup{{else}}setup{{end}}'
     preconditions:
       - sh: '[ "{{.INSTALL_SCOPE}}" = "user" ] || [ "{{.INSTALL_SCOPE}}" = "machine" ]'
         msg: "INSTALL_SCOPE must be 'user' or 'machine', got '{{.INSTALL_SCOPE}}'"
@@ -168,7 +170,7 @@ tasks:
     vars:
       ARCH: "{{.ARCH | default ARCH}}"
       ARG_FLAG: '{{if eq .ARCH "amd64"}}AMD64{{else}}ARM64{{end}}'
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
       GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
 
       # 去掉 v 前缀的显示版本（利用 Taskfile 内置模板函数，彻底告别 sed）
@@ -182,6 +184,9 @@ tasks:
     summary: Creates an MSIX package
     deps:
       - task: build
+        vars:
+          # 注入 setup tag。如果已有其他 tags 则追加。
+          EXTRA_TAGS: '{{if .EXTRA_TAGS}}{{.EXTRA_TAGS}},setup{{else}}setup{{end}}'
     cmds:
       - |-
         wails3 tool msix \
@@ -232,10 +237,10 @@ tasks:
     deps:
       - task: create:nsis:installer
         vars:
-          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
           GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
     vars:
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
       GUI_VERSION: '{{.GUI_VERSION | default "v0.0.0"}}'
     cmds:
       - wails3 tool sign --input "build/windows/nsis/{{.APP_NAME}}-installer.exe" {{if .SIGN_CERTIFICATE}}--certificate "{{.SIGN_CERTIFICATE}}"{{end}} {{if .SIGN_THUMBPRINT}}--thumbprint "{{.SIGN_THUMBPRINT}}"{{end}} {{if .TIMESTAMP_SERVER}}--timestamp "{{.TIMESTAMP_SERVER}}"{{end}}

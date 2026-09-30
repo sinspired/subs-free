@@ -15,6 +15,7 @@
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
         <security>
             <requestedPrivileges>
+                <!-- Setup 如果选了 machine 需要开启权限 -->
                 <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
             </requestedPrivileges>
         </security>
