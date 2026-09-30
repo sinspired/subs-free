@@ -13,7 +13,7 @@ require (
 	github.com/metacubex/mihomo v1.19.31
 	github.com/metacubex/utls v1.8.7
 	github.com/sinspired/subs-check-pro-webui v1.3.7
-	github.com/sinspired/subs-check-pro/v3 v3.2.3
+	github.com/sinspired/subs-check-pro/v3 v3.2.4
 	github.com/wailsapp/wails/v3 v3.0.0-beta.26
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
