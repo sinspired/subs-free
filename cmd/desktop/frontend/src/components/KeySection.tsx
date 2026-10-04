@@ -197,14 +197,14 @@ export function KeySection({ info, toast, onSelectConfig }: Props) {
 
         {info.isFirstRun && (
           <div class="hint first-run">
-            🎉 首次运行 — 配置文件已创建：
+            🎉 已创建默认配置文件：
             <code>{info.configPath || 'config/config.yaml'}</code>
           </div>
         )}
 
         {info.keyIsRandom && !info.isFirstRun && (
           <div class="hint warn">
-            ⚠️ 当前密钥随机生成，重启后将变更。建议在{' '}
+            ⚠️ Web 访问建议固定密钥。建议在{' '}
             <code>config.yaml</code> 中固定 <code>api-key</code>。
           </div>
         )}
