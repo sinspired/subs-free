@@ -1039,7 +1039,7 @@ export function App() {
             </div>
             <div class="info-group">
               <div class="label">配置</div>
-              <div class="cfg-path-row" onClick={() => setSheetPath(true)}>
+              <div class="cfg-path-row" onClick={() => { triggerHaptic("selection"); setSheetPath(true) }}>
                 <span class="cfg-path-text" ref={attachPathTruncate}>{info?.configPath}</span>
               </div>
             </div>
