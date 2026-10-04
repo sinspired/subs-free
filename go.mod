@@ -9,11 +9,11 @@ replace gopkg.in/ini.v1 => github.com/go-ini/ini v1.67.3
 require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
-	github.com/lmittmann/tint v1.2.0
+	github.com/lmittmann/tint v1.2.1
 	github.com/metacubex/mihomo v1.19.32
 	github.com/metacubex/utls v1.8.8
-	github.com/sinspired/subs-check-pro-webui v1.4.0
-	github.com/sinspired/subs-check-pro/v3 v3.3.0
+	github.com/sinspired/subs-check-pro-webui v1.5.0
+	github.com/sinspired/subs-check-pro/v3 v3.4.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.27
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -72,7 +72,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v86 v86.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20261002000307-77d3b59017a0 // indirect
+	github.com/google/pprof v0.0.0-20261003200830-ebaad5f31b4d // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
@@ -145,7 +145,7 @@ require (
 	github.com/oschwald/maxminddb-golang/v2 v2.7.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.31 // indirect
+	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/pires/go-proxyproto v0.15.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.63.0 // indirect
