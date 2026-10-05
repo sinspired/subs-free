@@ -22,6 +22,15 @@ if (!(Array.prototype as any).at) {
   };
 }
 
+// 提前执行的主题与背景色注入
+try {
+  const savedTheme = localStorage.getItem("scp-theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", initialTheme);
+  document.body.style.backgroundColor = initialTheme === "dark" ? "#111317" : "#f2f4f6";
+} catch (e) { }
+
 // --- Types ---
 interface AppInfo {
   apiKey: string;
@@ -119,9 +128,15 @@ export function App() {
 
   // Sub-Store 容器管理
   const [subStoreUrl, setSubStoreUrl] = useState<string | null>(null);
+  const subStoreOpenRef = useRef(false);
+  subStoreOpenRef.current = !!subStoreUrl;
 
   const pathRef = useRef<HTMLSpanElement>(null);
   const initTimerRef = useRef<number>();
+
+  const isCheckingRef = useRef(false);
+  // 保持实时同步
+  isCheckingRef.current = status?.isChecking || false;
 
   // 通用震动反馈函数
   const triggerHaptic = useCallback((type: "selection" | "impact" | "notification" = "selection") => {
@@ -130,7 +145,7 @@ export function App() {
         (GuiApp as any).HapticFeedback(type);
       }
     } catch (e) {
-      console.warn("震动反馈调用失败", e);
+      // 忽略因底层未加载完引起的报错
     }
   }, []);
 
@@ -212,32 +227,91 @@ export function App() {
     });
   };
 
-  // 初始化与主题
+  // 初始化与主题和生命周期
   useEffect(() => {
     const saved = localStorage.getItem("scp-theme") as "light" | "dark" | null;
     const initialTheme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     setTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
-    // 同步一次系统状态栏外观
-    GuiApp.SetStatusBarAppearance(initialTheme === "dark");
 
-    initApp();
-    const interval = setInterval(pollStatus, 1000);
+    let interval: number;
 
-    // 当应用从后台切回前台时，主动验证一次内核是否存活！
+    // 安全延迟调用 Android JNI 接口与所有 IPC 请求，防止从后台冷重建 Activity 时由于 Context 未就绪导致底层闪退
+    const mountTimeout = setTimeout(() => {
+      try { GuiApp.SetStatusBarAppearance(initialTheme === "dark"); } catch (e) { }
+      try {
+        if (!isCheckingRef.current && typeof (GuiApp as any).StopForegroundService === 'function') {
+          (GuiApp as any).StopForegroundService();
+        }
+      } catch (e) { }
+
+      initApp();
+      interval = window.setInterval(pollStatus, 1000);
+    }, 600);
+
+    // 核心生命周期管理：根据前后台状态智能切换保活服务
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        pollStatus(true);
+      const isHidden = document.visibilityState === "hidden";
+
+      if (isHidden) {
+        // 切到后台
+        if (isCheckingRef.current) {
+          // 如果正在检测中，关闭屏幕常亮省电（服务依然会继续跑）
+          try { GuiApp.SetKeepAwake(false); } catch (e) { }
+        } else {
+          // 如果没有在检测，挂起常规前台服务，保证外部环境能拉取订阅！
+          try { (GuiApp as any).StartForegroundService("Subs Free 运行中", "正在后台提供订阅拉取等网络服务"); } catch (e) { }
+        }
+      } else {
+        // 切前台：UI完全静默，底层延迟300ms发起请求，给WebView恢复时间防止IPC报错
+        setTimeout(() => {
+          pollStatus(true);
+          if (isCheckingRef.current) {
+            try { GuiApp.SetKeepAwake(true); } catch (e) { }
+          } else {
+            try { (GuiApp as any).StopForegroundService(); } catch (e) { }
+          }
+        }, 300);
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      clearTimeout(mountTimeout);
       clearInterval(interval);
       window.clearTimeout(initTimerRef.current);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
+
+  // 拦截物理返回键 (绝对拦截退出，防止 Android 9 误杀 Activity)
+  useEffect(() => {
+    // 注入 root 状态
+    window.history.pushState({ root: true }, "");
+
+    const handlePopState = (e: PopStateEvent) => {
+      // 1. 若订阅管理容器开着，返回键用于关闭容器
+      if (subStoreOpenRef.current) {
+        setSubStoreUrl(null);
+        return;
+      }
+
+      // 2. 退到了真正的起点（强制拦截，拒绝销毁界面）
+      if (!e.state) {
+        window.history.pushState({ root: true }, "");
+        showToast("请按 Home 键退回桌面", "info");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // 封装打开外部浏览器
+  const openExternalBrowser = (url: string) => {
+    triggerHaptic("notification");
+    try { (GuiApp as any).OpenInBrowser(url); } catch (e) { }
+  };
 
   // 引入更新检查单例 Promise，杜绝时序竞态现象
   const updateCheckPromise = useRef<Promise<UpdateInfo> | null>(null);
@@ -249,7 +323,6 @@ export function App() {
         updateCheckPromise.current = null;
       });
     }
-    // 不管是第几次调用，只要有网络请求在飞，就直接返回这个正在飞的 Promise 给调用者
     return updateCheckPromise.current;
   };
 
@@ -264,9 +337,7 @@ export function App() {
             setUpdateInfo(res);
           }
         }
-      } catch (e) {
-        console.warn("静默检查更新失败:", e);
-      }
+      } catch (e) { }
     };
     // 延迟 3 秒检查，不阻塞主流程
     timer = window.setTimeout(checkSilent, 3000);
@@ -291,7 +362,7 @@ export function App() {
     await new Promise(r => setTimeout(r, 60));
 
     try {
-      // 若此时后台的 checkSilent 正在执行，这里会自动复用它的请求等待其完成，绝对不会发出第二次！
+      // 若此时后台的 checkSilent 正在执行，这里会自动复用它的请求等待其完成
       const res = await fetchUpdateSafe();
       if (res.error) {
         showToast(`检查失败: ${res.error}`, "error");
@@ -325,12 +396,12 @@ export function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // 主页左下角版本号点击逻辑
+  // 主页版本号点击逻辑
   const handleVersionClick = () => {
     if (updateInfo?.hasUpdate) {
-      setUpdateModalVisible(true); // 有更新时唤起下载弹窗
+      setUpdateModalVisible(true);
     } else {
-      (GuiApp as any).OpenInBrowser("https://github.com/sinspired/subs-free");
+      openExternalBrowser("https://github.com/sinspired/subs-free");
     }
   };
 
@@ -341,12 +412,11 @@ export function App() {
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("scp-theme", next);
     // 深色背景配深色图标（或反过来）会导致状态栏内容看不清。
-    GuiApp.SetStatusBarAppearance(next === "dark");
+    try { GuiApp.SetStatusBarAppearance(next === "dark"); } catch (e) { }
   };
 
   const showToast = (msg: string, type: "info" | "success" | "error" = "info") => {
     setToast({ msg, type, visible: true });
-    // 当出现 失败 弹窗时，自动触发 Notification 级别震动
     if (type === "success" || type === "error") {
       triggerHaptic("notification");
     }
@@ -362,6 +432,7 @@ export function App() {
       }
 
       if (data.initErr) {
+        // Go 后端明确告知初始化失败 (如端口占用)
         setErrMsg(data.initErr);
         setLoading(false);
         return;
@@ -375,6 +446,8 @@ export function App() {
         return;
       }
 
+      // 成功获取，清除可能残留的界面错误
+      setErrMsg("");
       setInfo(data);
       try {
         const infoStr = JSON.stringify(data);
@@ -386,9 +459,9 @@ export function App() {
       setLoading(false);
       fetchLastCheckStats();
     } catch (err) {
-      // 捕获到 Wails 桥异常时，一般说明进程/上下文断开，强制重启加载流程
-      setErrMsg(String(err));
-      setLoading(false);
+      // 桥接未加载完时静默重试，避免破坏 UI 导致白屏
+      window.clearTimeout(initTimerRef.current);
+      initTimerRef.current = window.setTimeout(initApp, 1000);
     }
   };
 
@@ -442,17 +515,31 @@ export function App() {
       }
 
       setStatus(prev => {
+        const isHidden = document.visibilityState === "hidden";
+
         if (!prev?.isChecking && newStatus.isChecking) {
-          // 检测开始：保持屏幕常亮（前台生效），并启动前台服务 + 常驻通知
-          // （安卓专属，非安卓平台是空操作），这样即使用户把应用切到后台，检测任务也不会被系统限流/杀掉。
-          GuiApp.SetKeepAwake(true);
-          GuiApp.StartForegroundService("正在检测节点", "检测任务运行中，请勿关闭应用");
+          // 检测开始
+          try {
+            if (!isHidden) GuiApp.SetKeepAwake(true);
+            GuiApp.StartForegroundService("Subs Free 运行中", "正在检测节点，请勿关闭应用");
+          } catch (e) { }
         }
+
         if (prev?.isChecking && !newStatus.isChecking) {
-          GuiApp.SetKeepAwake(false);
-          GuiApp.StopForegroundService();
+          // 检测结束
+          try {
+            GuiApp.SetKeepAwake(false); // 结束时一定关掉常亮
+
+            if (isHidden) {
+              // ⚠️ 如果是在后台检测结束的，降级为普通供网通知，避免断网！
+              GuiApp.StartForegroundService("Subs Free 运行中", "正在后台提供订阅拉取等网络服务");
+            } else {
+              // 在前台则清理通知
+              GuiApp.StopForegroundService();
+            }
+          } catch (e) { }
+
           showToast("检测任务已完成", "success");
-          // 会先展示 status.lastResult 兜底文本，等新请求成功后才跳成统计卡片）。
           setFinalizing(true);
           fetchLastCheckStats().finally(() => setFinalizing(false));
           triggerHaptic("notification")
@@ -460,11 +547,7 @@ export function App() {
         return newStatus;
       });
     } catch (e) {
-      // 若获取状态时报底层的异常(Wails断开)，切入重连逻辑
-      if (isVisibilityResume) {
-        setLoading(true);
-        initApp();
-      }
+      // IPC 通信异常静默处理
     }
   };
 
@@ -505,7 +588,7 @@ export function App() {
     }
   };
 
-  // 检测启动逻辑：预检测网络与电量拦截（高鲁棒性 + 极简陈述 + 高亮数值）
+  // 检测启动逻辑：预检测网络与电量拦截
   const toggleCheck = async () => {
     if (actionInFlight) return;
     triggerHaptic("impact");
@@ -564,7 +647,6 @@ export function App() {
             content = <Fragment>当前设备电量偏低 ({batterySpan})。<br />耗时的检测可能会导致设备耗尽电量。</Fragment>;
           }
 
-          // 将之前隐藏的 8 秒倒计时逻辑显式传递进弹窗
           shouldContinue = await requestConfirm(title, content, alertType, 8);
         }
       } catch (e) {
@@ -665,7 +747,6 @@ export function App() {
       // 3. 给内核重载配置的时间
       await new Promise(r => setTimeout(r, 600));
 
-      // 4. 乐观更新（不再强制校验抛错）：只要上一步存进去了，即使内核还没反应过来导致校验未过，我们也认定它是成功的。
       let verifyInfo: AppInfo | null;
       try { verifyInfo = await GuiApp.GetAppInfo(); } catch (e) { }
 
@@ -844,7 +925,7 @@ export function App() {
     return md2html(updateInfo.releaseNotes);
   }, [updateInfo?.releaseNotes]);
 
-  // 渲染分支
+  // 渲染分支：仅在真正的初次/销毁重建加载时显示 Loading 骨架屏
   if (loading) {
     return (
       <div class="m-page flex-center">
@@ -895,7 +976,7 @@ export function App() {
             GUI&nbsp;{info?.guiVersion || "dev"}
           </a>
           <span class="ver-dot">·</span>
-          <a class="ver-tag ver-core" onClick={() => (GuiApp as any).OpenInBrowser("https://github.com/sinspired/subs-check-pro")}>
+          <a class="ver-tag ver-core" onClick={() => openExternalBrowser("https://github.com/sinspired/subs-check-pro")}>
             内核&nbsp;{info?.coreVersion || "dev"}
           </a>
         </div>
@@ -1049,7 +1130,7 @@ export function App() {
 
       <footer class="m-footer">
         <div class="quick-actions">
-          <button class="btn-quick" onClick={() => { triggerHaptic("notification"); GuiApp.OpenInBrowser(`http://127.0.0.1:${info?.listenPort}`); }} title="在系统浏览器中打开管理面板">
+          <button class="btn-quick" onClick={() => { triggerHaptic("notification"); openExternalBrowser(`http://127.0.0.1:${info?.listenPort}`); }} title="在系统浏览器中打开管理面板">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
           </button>
           <button class="btn-quick" onClick={() => { triggerHaptic("selection"); window.location.href = "/analysis.html"; }} title="分析报告">
@@ -1160,7 +1241,7 @@ export function App() {
               </div>
             </button>
 
-            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); openExternalBrowser("https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro"); }}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" viewBox="0 0 24 24">
                   <path d="M12,2C6.5,2,2,6.5,2,12s4.5,10,10,10s10-4.5,10-10S17.5,2,12,2z M16.9,8.1l-1.7,8.2c-0.1,0.6-0.5,0.7-0.9,0.4l-2.6-2 c-0.6,0.6-1.2,1.1-1.3,1.3c-0.2,0.1-0.3,0.3-0.5,0.3c-0.3,0-0.3-0.2-0.4-0.4l-0.9-3L5.9,12c-0.6-0.2-0.6-0.6,0.1-0.9l10.2-3.9 C16.6,7.1,17.1,7.3,16.9,8.1z M14.5,9l-5.7,3.6l0.9,3l0.2-2l4.9-4.4C15.1,8.9,14.9,8.9,14.5,9z" fill="currentColor" />
@@ -1175,7 +1256,7 @@ export function App() {
                 <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://github.com/sinspired/subs-free"); }}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); openExternalBrowser("https://github.com/sinspired/subs-free"); }}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" width="800px" height="800px" viewBox="0 0 24 24">
                   <path d="M12,2A10,10,0,0,0,8.84,21.5c.5.08.66-.23.66-.5V19.31C6.73,19.91,6.14,18,6.14,18A2.69,2.69,0,0,0,5,16.5c-.91-.62.07-.6.07-.6a2.1,2.1,0,0,1,1.53,1,2.15,2.15,0,0,0,2.91.83,2.16,2.16,0,0,1,.63-1.34C8,16.17,5.62,15.31,5.62,11.5a3.87,3.87,0,0,1,1-2.71,3.58,3.58,0,0,1,.1-2.64s.84-.27,2.75,1a9.63,9.63,0,0,1,5,0c1.91-1.29,2.75-1,2.75-1a3.58,3.58,0,0,1,.1,2.64,3.87,3.87,0,0,1,1,2.71c0,3.82-2.34,4.66-4.57,4.91a2.39,2.39,0,0,1,.69,1.85V21c0,.27.16.59.67.5A10,10,0,0,0,12,2Z" fill="currentColor" />
@@ -1190,7 +1271,7 @@ export function App() {
                 <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
-            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); GuiApp.OpenInBrowser("https://github.com/sinspired/subs-check-pro"); }}>
+            <div class="aw-link-card" onClick={() => { triggerHaptic("selection"); openExternalBrowser("https://github.com/sinspired/subs-check-pro"); }}>
               <div class="aw-link-icon-wrap">
                 <svg class="aw-link-svg" width="800px" height="800px" viewBox="0 0 24 24">
                   <path d="M12,2A10,10,0,0,0,8.84,21.5c.5.08.66-.23.66-.5V19.31C6.73,19.91,6.14,18,6.14,18A2.69,2.69,0,0,0,5,16.5c-.91-.62.07-.6.07-.6a2.1,2.1,0,0,1,1.53,1,2.15,2.15,0,0,0,2.91.83,2.16,2.16,0,0,1,.63-1.34C8,16.17,5.62,15.31,5.62,11.5a3.87,3.87,0,0,1,1-2.71,3.58,3.58,0,0,1,.1-2.64s.84-.27,2.75,1a9.63,9.63,0,0,1,5,0c1.91-1.29,2.75-1,2.75-1a3.58,3.58,0,0,1,.1,2.64,3.87,3.87,0,0,1,1,2.71c0,3.82-2.34,4.66-4.57,4.91a2.39,2.39,0,0,1,.69,1.85V21c0,.27.16.59.67.5A10,10,0,0,0,12,2Z" fill="currentColor" />
@@ -1226,7 +1307,6 @@ export function App() {
           <div class="aw-update-details-card">
             <div class="aw-update-meta-header">
               <div class="aw-update-meta-item">
-                {/* <span class="aw-update-meta-label">Date</span> */}
                 <span class="aw-update-meta-val">{updateInfo?.publishDate || 'Unknown'}</span>
               </div>
 
@@ -1258,7 +1338,7 @@ export function App() {
                 const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
                 if (anchor) {
                   e.preventDefault();
-                  (GuiApp as any).OpenInBrowser(anchor.href);
+                  openExternalBrowser(anchor.href);
                 }
               }}
             />
@@ -1269,8 +1349,8 @@ export function App() {
             <button class="btn-modal btn-primary" onClick={() => {
               triggerHaptic("impact");
               // 正常版读取 apkNormalUrl
-              const targetUrl = updateInfo?.apkNormalUrl || updateInfo?.downloadURL;
-              (GuiApp as any).OpenInBrowser(targetUrl);
+              const targetUrl = updateInfo?.apkNormalUrl || updateInfo?.downloadURL || "";
+              openExternalBrowser(targetUrl);
               setUpdateModalVisible(false);
             }}>立即下载</button>
           </div>
