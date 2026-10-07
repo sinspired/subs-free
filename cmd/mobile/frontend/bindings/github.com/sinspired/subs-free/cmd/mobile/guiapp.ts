@@ -42,6 +42,15 @@ export function CopyToClipboard(text: string): $CancellablePromise<boolean> {
     return $Call.ByID(3613982208, text);
 }
 
+/**
+ * ExitApp 退出应用：先优雅关闭内核（ShutdownCore），再结束进程。
+ * 不依赖任何 Java 层改动。结束进程前短暂等待，让异步投递的 stopService 先执行，
+ * 避免 START_STICKY 的前台服务在进程退出后被系统重新拉起、残留通知。
+ */
+export function ExitApp(): $CancellablePromise<void> {
+    return $Call.ByID(3950223045);
+}
+
 export function GetAppInfo(): $CancellablePromise<$models.AppInfo> {
     return $Call.ByID(1303911513);
 }
@@ -149,6 +158,22 @@ export function SetStatusBarAppearance(isDark: boolean): $CancellablePromise<voi
  */
 export function ShareLink(text: string, url: string): $CancellablePromise<void> {
     return $Call.ByID(3439861457, text, url);
+}
+
+/**
+ * ShutdownCore 供前端「退出应用」调用：先关闭后端内核，再由 Java 层结束进程。
+ * 
+ * 顺序：
+ *  1. 停止前台服务（否则通知会残留）
+ *  2. 调用 core.Shutdown()：取消 ctx（Sub-Store 等子服务退出）、停止定时任务与配置监听、
+ *     优雅关闭 HTTP 服务器（内部最长等待 5 秒，另有 500ms 清理等待）
+ * 
+ * 整体设置 8 秒上限，防止个别任务卡死导致"退出"按钮一直无响应。
+ * 返回 true 表示内核已完整关闭，false 表示超时（调用方仍应继续退出流程）。
+ * 多次调用安全：只会真正关闭一次。
+ */
+export function ShutdownCore(): $CancellablePromise<boolean> {
+    return $Call.ByID(68459767);
 }
 
 /**

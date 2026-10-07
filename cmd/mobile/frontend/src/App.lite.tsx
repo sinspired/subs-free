@@ -117,6 +117,13 @@ export function App() {
   const [sheetAbout, setSheetAbout] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "info" | "success" | "error"; visible: boolean }>({ msg: "", type: "info", visible: false });
 
+  // 返回键：退出 / 后台运行 选择弹窗
+  const [exitDialogVisible, setExitDialogVisible] = useState(false);
+  const exitDialogOpenRef = useRef(false);
+  exitDialogOpenRef.current = exitDialogVisible;
+  // 用户选择退出后置为 true：停止轮询，并且不再因为"切到后台"而重新拉起前台服务
+  const exitingRef = useRef(false);
+
   const pathRef = useRef<HTMLSpanElement>(null);
   const initTimerRef = useRef<number>();
 
@@ -237,6 +244,9 @@ export function App() {
 
     // 核心生命周期管理：根据前后台状态智能切换保活服务
     const handleVisibility = () => {
+      // 正在退出：Activity 结束会触发 hidden，不能再重新拉起前台服务
+      if (exitingRef.current) return;
+
       const isHidden = document.visibilityState === "hidden";
 
       if (isHidden) {
@@ -271,6 +281,7 @@ export function App() {
   }, []);
 
   // 拦截物理返回键 (绝对拦截退出，防止 Android 9 误杀 Activity)
+  // 返回键 / 返回手势 / 虚拟导航键 → 弹出「后台运行 / 退出应用」选择框
   useEffect(() => {
     // 注入 root 状态
     window.history.pushState({ root: true }, "");
@@ -279,13 +290,76 @@ export function App() {
       // 退到了真正的起点（强制拦截，拒绝销毁界面）
       if (!e.state) {
         window.history.pushState({ root: true }, "");
-        showToast("请按 Home 键退回桌面", "info");
+
+        if (exitDialogOpenRef.current) {
+          // 退出弹窗已经打开时再按返回键 = 取消
+          setExitDialogVisible(false);
+        } else {
+          triggerHaptic("notification");
+          setExitDialogVisible(true);
+        }
       }
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  //  返回键弹窗的两个动作
+  // 原生能力若由壳工程注入了 window.AppControl 则优先使用（可选，不依赖）。
+  const getAppControl = () => (window as any).AppControl as
+    | { moveToBackground?: () => void; exitApp?: () => void }
+    | undefined;
+
+  // 后台运行：等价于按 Home 键。内核继续运行，切到后台时已有的 visibilitychange
+  // 逻辑会自动接管前台服务保活。
+  // 纯前端无法让应用回到桌面（WebView 没有对应 API）：壳工程若提供了 window.AppControl 就直接调用，
+  // 否则只关闭弹窗并提示手动按 Home 键——应用此时本来就在正常运行，不会受任何影响。
+  const handleRunInBackground = () => {
+    setExitDialogVisible(false);
+    triggerHaptic("selection");
+    const ctl = getAppControl();
+    if (ctl && typeof ctl.moveToBackground === "function") {
+      // 应用此刻仍在前台，先拉起前台服务保活（Android 12+ 只允许在前台启动）。
+      // 检测中时服务本来就在运行，不重复启动。
+      if (!isCheckingRef.current) {
+        try { (GuiApp as any).StartForegroundService("Subs Free 运行中", "正在后台提供订阅拉取等网络服务"); } catch (e) { }
+      }
+      try { ctl.moveToBackground(); return; } catch (e) { }
+    }
+    showToast("未检测到原生接口，请按 Home 键切到后台", "info");
+  };
+
+  // 退出应用：先关闭后端内核，再结束进程。
+  //   1) Go 侧 ShutdownCore：停前台服务 → app.Shutdown()（取消 ctx、停 Sub-Store、关 HTTP）
+  //   2) Java 侧 AppControl.exitApp()：finishAndRemoveTask + 结束进程（比 Go 直接 os.Exit 更干净）
+  // 壳工程没有 AppControl 时，由 Go 侧 ExitApp 兜底（关内核后 os.Exit）。
+  const handleExitApp = async () => {
+    setExitDialogVisible(false);
+    triggerHaptic("impact");
+    exitingRef.current = true;
+    showToast("正在关闭内核…", "info");
+
+    const ctl = getAppControl();
+    const hasNativeExit = !!ctl && typeof ctl.exitApp === "function";
+
+    try {
+      if (hasNativeExit && typeof (GuiApp as any).ShutdownCore === "function") {
+        await (GuiApp as any).ShutdownCore();
+      } else if (typeof (GuiApp as any).ExitApp === "function") {
+        await (GuiApp as any).ExitApp(); // 进程结束，通常不会返回
+        return;
+      } else if (typeof (GuiApp as any).ShutdownCore === "function") {
+        await (GuiApp as any).ShutdownCore();
+      }
+    } catch (e) { }
+
+    if (hasNativeExit) {
+      try { ctl!.exitApp!(); return; } catch (e) { }
+    }
+    exitingRef.current = false;
+    showToast("退出接口不可用：请更新 MainActivity 或重新生成 bindings 后重新构建", "error");
+  };
 
   // 封装打开外部浏览器
   const openExternalBrowser = (url: string) => {
@@ -324,7 +398,7 @@ export function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // ── 手动触发更新检查 ──
+  //  手动触发更新检查
   const handleCheckUpdate = async () => {
     if (checkingUpdate) return;
     triggerHaptic("selection");
@@ -461,6 +535,8 @@ export function App() {
 
   // 轮询内核检测状态
   const pollStatus = async (isVisibilityResume = false) => {
+    // 正在退出：内核已（或即将）关闭，不再发任何 IPC
+    if (exitingRef.current) return;
     try {
       const newStatus = await GuiApp.GetCheckState();
 
@@ -874,6 +950,33 @@ export function App() {
     return md2html(updateInfo.releaseNotes);
   }, [updateInfo?.releaseNotes]);
 
+  const isChecking = status?.isChecking;
+  const progressPercent = status?.proxyCount ? (status.progress / status.proxyCount) * 100 : 0;
+
+  // 返回键弹窗 DOM（复用确认弹窗的 modal-* / btn-modal 样式）。
+  // 定义在所有提前 return 之前，这样 Loading / 内核启动失败 页面按返回键时同样能弹出。
+  const exitDialogEl = (
+    <div class={`modal-overlay ${exitDialogVisible ? "active" : ""}`} onClick={() => setExitDialogVisible(false)}>
+      <div class="modal-content" onClick={e => e.stopPropagation()}>
+        <div class={`modal-icon ${isChecking ? "modal-icon-warning" : "modal-icon-primary"}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+        </div>
+        <h3 class="modal-title">退出 Subs Free</h3>
+        <div class="modal-desc">
+          {isChecking ? (
+            <Fragment>检测任务正在进行。<br />后台运行将继续检测，退出会中止任务。</Fragment>
+          ) : (
+            <Fragment>后台运行会保留订阅服务，<br />其他应用仍可拉取订阅。</Fragment>
+          )}
+        </div>
+        <div class="modal-actions">
+          <button class="btn-modal btn-primary" onClick={handleRunInBackground}>后台运行</button>
+          <button class="btn-modal btn-danger" onClick={handleExitApp}>退出应用</button>
+        </div>
+      </div>
+    </div>
+  );
+
   // 渲染分支：仅在真正的初次/销毁重建加载时显示 Loading 骨架屏
   if (loading) {
     return (
@@ -883,6 +986,8 @@ export function App() {
           <div class="loading-ring"></div>
         </div>
         <p class="loading-text">正在唤醒内核</p>
+        {exitDialogEl}
+        <div class={`toast toast-${toast.type} ${toast.visible ? "show" : ""}`}>{toast.msg}</div>
       </div>
     );
   }
@@ -898,12 +1003,11 @@ export function App() {
           <p class="error-msg">{errMsg}</p>
           <p class="error-hint">请检查端口是否被占用，或彻底清理后台进程后重试。</p>
         </div>
+        {exitDialogEl}
+        <div class={`toast toast-${toast.type} ${toast.visible ? "show" : ""}`}>{toast.msg}</div>
       </div>
     );
   }
-
-  const isChecking = status?.isChecking;
-  const progressPercent = status?.proxyCount ? (status.progress / status.proxyCount) * 100 : 0;
 
   return (
     <div class="m-page">
@@ -1132,7 +1236,7 @@ export function App() {
         </div>
       </div>
 
-      {/* ── 关于与资源弹窗 ── */}
+      {/*  关于与资源弹窗  */}
       <div class={`bottom-sheet-overlay ${sheetAbout ? "active" : ""}`} onClick={() => setSheetAbout(false)}>
         <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
           <div class="sheet-drag-handle" {...bindDrag(() => setSheetAbout(false))}></div>
@@ -1305,6 +1409,9 @@ export function App() {
           </div>
         </div>
       </div>
+
+      {/* 返回键：后台运行 / 退出应用 选择弹窗 */}
+      {exitDialogEl}
 
       <div class={`toast toast-${toast.type} ${toast.visible ? "show" : ""}`}>{toast.msg}</div>
     </div>

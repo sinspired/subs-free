@@ -229,6 +229,33 @@ public class MainActivity extends AppCompatActivity {
 
         // Add JavaScript interface for Go communication
         webView.addJavascriptInterface(new WailsJSBridge(bridge, webView), "wails");
+
+        // 原生应用控制：供前端「返回键弹窗」调用（window.AppControl）。
+        // @JavascriptInterface 方法运行在 WebView 的 JS 线程，Activity 操作必须切回主线程。
+        webView.addJavascriptInterface(new Object() {
+            /** 后台运行：等价于按 Home 键。Activity 保持存活，Go 内核不受影响。 */
+            @android.webkit.JavascriptInterface
+            public void moveToBackground() {
+                runOnUiThread(() -> moveTaskToBack(true));
+            }
+
+            /**
+             * 退出应用：前端应已让 Go 侧优雅关闭内核（ShutdownCore）。
+             * 先停前台服务（WailsForegroundService 是 START_STICKY，进程被杀后系统会重新拉起它，通知会残留），
+             * 再移除任务并结束进程，保证下次启动是干净的冷启动。
+             */
+            @android.webkit.JavascriptInterface
+            public void exitApp() {
+                runOnUiThread(() -> {
+                    try {
+                        stopService(new Intent(MainActivity.this, WailsForegroundService.class));
+                    } catch (Exception ignored) { }
+                    finishAndRemoveTask();
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                            () -> android.os.Process.killProcess(android.os.Process.myPid()), 300);
+                });
+            }
+        }, "AppControl");
     }
 
     private void loadApplication() {
