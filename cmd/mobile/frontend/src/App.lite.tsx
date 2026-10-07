@@ -1316,6 +1316,20 @@ export function App() {
                 <polyline points="7 7 17 7 17 17"></polyline>
               </svg>
             </div>
+
+            {/* 退出应用按钮 */}
+            <div class="aw-link-card aw-exit-card" onClick={() => { triggerHaptic("notification"); setSheetAbout(false); setExitDialogVisible(true); }}>
+              <div class="aw-link-icon-wrap">
+                <svg class="aw-link-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                  <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+              </div>
+              <div class="aw-link-body">
+                <strong class="aw-link-title">退出应用</strong>
+                <span class="aw-link-desc">后台运行 或 完全关闭内核</span>
+              </div>
+            </div>
           </div>
           <div class="about-footer-copyright">
             © 2026 Sinspired · GPL-3.0 License
