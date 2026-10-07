@@ -22,15 +22,6 @@ if (!(Array.prototype as any).at) {
   };
 }
 
-// 提前执行的主题与背景色注入
-try {
-  const savedTheme = localStorage.getItem("scp-theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
-  document.documentElement.setAttribute("data-theme", initialTheme);
-  document.body.style.backgroundColor = initialTheme === "dark" ? "#111317" : "#f2f4f6";
-} catch (e) { }
-
 // --- Types ---
 interface AppInfo {
   apiKey: string;
@@ -417,7 +408,8 @@ export function App() {
 
   const showToast = (msg: string, type: "info" | "success" | "error" = "info") => {
     setToast({ msg, type, visible: true });
-    if (type === "success" || type === "error") {
+    // 当出现 失败 弹窗时，自动触发 Notification 级别震动
+    if (type === "error") {
       triggerHaptic("notification");
     }
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 2000);
@@ -973,7 +965,7 @@ export function App() {
           {/* 置入 ver-tag (flex) 内部左侧 */}
           <a class={`ver-tag ver-gui ${info?.guiVersion?.includes('-') ? 'pre' : ''} ${updateInfo?.hasUpdate ? 'ver-new' : ''}`} onClick={handleVersionClick}>
             {updateInfo?.hasUpdate && <span class={`update-dot ${info?.guiVersion?.includes('-') ? 'pre' : ''}`}></span>}
-            GUI&nbsp;{info?.guiVersion || "dev"}
+            APP&nbsp;{info?.guiVersion || "dev"}
           </a>
           <span class="ver-dot">·</span>
           <a class="ver-tag ver-core" onClick={() => openExternalBrowser("https://github.com/sinspired/subs-check-pro")}>
