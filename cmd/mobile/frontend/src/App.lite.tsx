@@ -875,6 +875,7 @@ export function App() {
     }
 
     // 统一 UI 反馈
+    triggerHaptic("selection");
     if (success) {
       showToast(`已复制 ${name}`, "success");
     } else {
