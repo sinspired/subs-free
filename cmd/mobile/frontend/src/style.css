@@ -277,7 +277,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 
 /* 支持扩大触摸面积的 Handle */
 .sheet-drag-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; position: relative; touch-action: none; }
-.sheet-drag-handle::after { content: ""; position: absolute; inset: -20px -50px; }
+.sheet-drag-handle::after { content: ""; position: absolute; top: -20px; bottom: -20px; left: -50vw; right: -50vw; }
 .sheet-title { font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 1rem; letter-spacing: 0.5px; }
 .sheet-desc { font-size: 13px; color: var(--text-sub); text-align: center; margin-bottom: 20px; }
 
