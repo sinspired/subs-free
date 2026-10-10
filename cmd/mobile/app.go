@@ -541,7 +541,7 @@ func (g *GuiApp) GetSafeArea() SafeArea {
 
 	var safeArea SafeArea
 	if err := json.Unmarshal([]byte(safeAreaJSON), &safeArea); err != nil {
-		slog.Info("解析 SafeAreaJSON 出错", "error", err)
+		slog.Debug("解析 SafeAreaJSON 出错", "error", err)
 		return SafeArea{}
 	}
 

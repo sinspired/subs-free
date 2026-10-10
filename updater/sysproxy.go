@@ -58,7 +58,7 @@ func (t *fallbackTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		if resp, err := t.tryWithTimeout(t.sysProxyDirect, req, sysProxyAttemptTimeout); err == nil {
 			return resp, nil
 		} else {
-			slog.Warn("系统代理直连 GitHub 失败，立即切换为不经系统代理的 GitHub 代理线路兜底",
+			slog.Warn("系统代理连接 GitHub 失败，切换直连线路",
 				"url", req.URL.String(), "error", err)
 		}
 	}
