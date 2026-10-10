@@ -192,9 +192,9 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .icon-random {width: 12px;height: 12px;color: var(--warning);}
 .icon-check {width: 12px;height: 12px;color: var(--text-sub);}
 .checking-label { color: var(--primary); font-size: 12px; text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; flex: 1; }
-.status-badge { display:flex; align-items:center; font-size: 10px; font-weight:600; border-radius:99px; flex-shrink:0; padding: 3px 10px; }
+.status-badge { display:flex; align-items:center; font-size: 10px; font-weight:600; border-radius:99px; flex-shrink:0; padding: 3px 0px; }
 .status-badge .dot { width:4px; height:4px; border-radius:50%; background:currentColor; margin-right:5px; flex-shrink:0; }
-.status-badge.checking { background: rgba(14, 165, 160, 0.1); color: var(--primary); }
+.status-badge.checking { background: transparent; color: var(--primary); }
 .status-badge.idle { background: transparent; color: var(--text-sub); opacity: 0.85; }
 .status-badge.idle .dot { color: var(--success); }
 .status-badge.checking .dot { animation: fade-in 1s infinite alternate; }
@@ -279,7 +279,7 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .list-item .link-icon { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
 /* 动态适应深浅色：针对 svg */
 img.link-icon {filter: invert(var(--invert));}
-.list-item .link-text { flex: 1; font-size: 15px; font-weight: 500; color: var(--text-main); }
+.list-item .link-text { z-index: 2; flex: 1; font-size: 15px; font-weight: 500; color: var(--text-main); }
 .list-item .link-copy-icon { width: 18px; height: 18px; color: var(--text-sub); opacity: 0.5; transition: opacity 0.2s; }
 .list-item .share-link-btn { display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 8px; background: transparent; border: none; color: var(--text-sub); opacity: 0.5; transition: opacity 0.2s, background-color 0.2s; }
 .list-item .share-link-btn svg { width: 17px; height: 17px; }
@@ -288,7 +288,7 @@ img.link-icon {filter: invert(var(--invert));}
 
 .path-full-box { background: var(--bg); border: 1px solid var(--border); border-radius: 28px; padding: 28px 16px; margin-top: 28px; margin-bottom: 16px; }
 .path-full-text { font-family: monospace; font-size: 12px; color: var(--text-main); word-break: break-all; }
-.btn-config-copy { flex: 0; height: 32px; width: 100%; display: flex; justify-content: center; align-items: center; background: var(--btn-primary-bg); color: var(--btn-primary-text); border: 1px solid var(--btn-primary-border); border-radius: 32px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 16px rgba(0,0,0,0.03); transition: transform 0.2s; cursor: pointer; margin-bottom: 12px; }
+.btn-config-copy { position: relative; z-index: 2; flex: 0; height: 32px; width: 100%; display: flex; justify-content: center; align-items: center; background: var(--btn-primary-bg); color: var(--btn-primary-text); border: 1px solid var(--btn-primary-border); border-radius: 32px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 16px rgba(0,0,0,0.03); transition: transform 0.2s; cursor: pointer; margin-bottom: 12px; }
 
 /* ── 提示与加载动画 ── */
 .loading-wrapper { position: relative; width: 80px; height: 80px; display: flex; justify-content: center; align-items: center; margin: 0 auto 24px; }

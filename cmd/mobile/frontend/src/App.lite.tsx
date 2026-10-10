@@ -148,30 +148,36 @@ export function App() {
       const touch = e.touches[0];
       e.currentTarget.dataset.startY = String(touch.clientY);
       e.currentTarget.dataset.dragging = "true";
-      const sheet = e.currentTarget.closest(".bottom-sheet");
-      if (sheet) sheet.style.transition = "none";
+      e.currentTarget.style.transition = "none";
     },
     onTouchMove: (e: any) => {
       if (e.currentTarget.dataset.dragging === "true") {
         const touch = e.touches[0];
         const delta = touch.clientY - parseFloat(e.currentTarget.dataset.startY || "0");
+
+        // 智能判定内部滚动区域：如果触摸在滚动列表内，且列表未置顶，则优先让列表滚动
+        const target = e.target as HTMLElement | null;
+        const scrollable = target?.closest?.('.sheet-list');
+        if (scrollable && scrollable.scrollTop > 0 && delta > 0) {
+          return;
+        }
+
         if (delta > 0) {
-          const sheet = e.currentTarget.closest(".bottom-sheet");
-          if (sheet) sheet.style.transform = `translateY(${delta}px)`;
+          // 如果是在非滚动区域拖拽，或者列表已到顶部继续下拉，则拖动整个面板
+          // 阻止默认行为以防部分浏览器触发整体页面的下拉刷新橡皮筋效果
+          if (e.cancelable && !scrollable) e.preventDefault();
+          e.currentTarget.style.transform = `translateY(${delta}px)`;
         }
       }
     },
     onTouchEnd: (e: any) => {
       e.currentTarget.dataset.dragging = "false";
-      const sheet = e.currentTarget.closest(".bottom-sheet");
-      if (sheet) {
-        sheet.style.transition = "";
-        const transformStr = sheet.style.transform;
-        sheet.style.transform = "";
-        const match = transformStr.match(/translateY\(([\d.]+)px\)/);
-        if (match && parseFloat(match[1]) > 50) {
-          closeFn();
-        }
+      e.currentTarget.style.transition = "";
+      const transformStr = e.currentTarget.style.transform || "";
+      e.currentTarget.style.transform = "";
+      const match = transformStr.match(/translateY\(([\d.]+)px\)/);
+      if (match && parseFloat(match[1]) > 50) {
+        closeFn();
       }
     }
   }), []);
@@ -1200,8 +1206,10 @@ export function App() {
 
       {/* --- Bottom Sheets 弹窗群 --- */}
       <div class={`bottom-sheet-overlay ${sheetSub ? "active" : ""}`} onClick={() => setSheetSub(false)}>
-        <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle" {...bindDrag(() => setSheetSub(false))}></div>
+        {/* 1. 挂载给 bottom-sheet */}
+        <div class="bottom-sheet" onClick={e => e.stopPropagation()} {...bindDrag(() => setSheetSub(false))}>
+          {/* 清空 handle 上的绑定 */}
+          <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">订阅链接</h3>
           <p class="sheet-desc">建议在 Subs Free 同局域网代理客户端导入以下链接</p>
           <div class="sheet-list">
@@ -1227,8 +1235,9 @@ export function App() {
       </div>
 
       <div class={`bottom-sheet-overlay ${sheetPath ? "active" : ""}`} onClick={() => setSheetPath(false)}>
-        <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle" {...bindDrag(() => setSheetPath(false))}></div>
+        {/* 2. 挂载给 bottom-sheet */}
+        <div class="bottom-sheet" onClick={e => e.stopPropagation()} {...bindDrag(() => setSheetPath(false))}>
+          <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
           <button class="btn-config-copy" onClick={() => { copyText(info!.configPath, "配置文件路径"); }}>
@@ -1239,8 +1248,9 @@ export function App() {
 
       {/*  关于与资源弹窗  */}
       <div class={`bottom-sheet-overlay ${sheetAbout ? "active" : ""}`} onClick={() => setSheetAbout(false)}>
-        <div class="bottom-sheet" onClick={e => e.stopPropagation()}>
-          <div class="sheet-drag-handle" {...bindDrag(() => setSheetAbout(false))}></div>
+        {/* 3. 挂载给 bottom-sheet */}
+        <div class="bottom-sheet" onClick={e => e.stopPropagation()} {...bindDrag(() => setSheetAbout(false))}>
+          <div class="sheet-drag-handle"></div>
           <div class="about-header-mobile">
             <img src="/static/icon/subs-check-pro.svg" class="about-logo-mobile" />
             <div class="about-title-mobile">Subs Free</div>
