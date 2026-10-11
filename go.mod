@@ -12,8 +12,8 @@ require (
 	github.com/lmittmann/tint v1.2.1
 	github.com/metacubex/mihomo v1.19.32
 	github.com/metacubex/utls v1.8.8
-	github.com/sinspired/subs-check-pro-webui v1.6.0
-	github.com/sinspired/subs-check-pro/v3 v3.5.0
+	github.com/sinspired/subs-check-pro-webui v1.7.0
+	github.com/sinspired/subs-check-pro/v3 v3.5.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -44,8 +44,8 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dunglas/httpsfv v1.1.2 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/easytier/easytier/easytier-go v0.0.0-20261006170335-728ba94b5029 // indirect
-	github.com/enfein/mieru/v3 v3.38.0 // indirect
+	github.com/easytier/easytier/easytier-go v0.0.0-20261010173533-7592951b808c // indirect
+	github.com/enfein/mieru/v3 v3.38.1 // indirect
 	github.com/ericlagergren/aegis v0.0.0-20250325060835-cd0defd64358 // indirect
 	github.com/ericlagergren/polyval v0.0.0-20230805202542-18692a1b76f9 // indirect
 	github.com/ericlagergren/siv v0.0.0-20220507050439-0b757b3aa5f1 // indirect
@@ -72,7 +72,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v86 v86.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20261006160405-d99a6174ef52 // indirect
+	github.com/google/pprof v0.0.0-20261008003335-7bae8d8c4c9e // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
@@ -109,7 +109,7 @@ require (
 	github.com/metacubex/jls-tls v0.0.0-20260723084315-67adc0e2f796 // indirect
 	github.com/metacubex/jsonv2 v0.0.0-20260721082349-16b4998c8f89 // indirect
 	github.com/metacubex/kcp-go v0.0.0-20260105040817-550693377604 // indirect
-	github.com/metacubex/mipstack v0.0.0-20260930071539-961d4b1c1983 // indirect
+	github.com/metacubex/mipstack v0.0.0-20261006001519-f63e154680fb // indirect
 	github.com/metacubex/mlkem v0.1.0 // indirect
 	github.com/metacubex/qpack v0.6.0 // indirect
 	github.com/metacubex/quic-go v0.61.1-0.20260727080200-2548683b76f4 // indirect
@@ -157,7 +157,7 @@ require (
 	github.com/sina-ghaderi/poly1305 v0.0.0-20220724002748-c5926b03988b // indirect
 	github.com/sina-ghaderi/rabaead v0.0.0-20220730151906-ab6e06b96e8c // indirect
 	github.com/sina-ghaderi/rabbitio v0.0.0-20220730151941-9ce26f4f872e // indirect
-	github.com/sinspired/checkip v0.5.5 // indirect
+	github.com/sinspired/checkip v0.5.6 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/sohaha/zlsgo v1.7.21 // indirect
 	github.com/tailscale/certstore v0.1.1-0.20260409135935-3638fb84b77d // indirect
@@ -182,16 +182,16 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
-	golang.org/x/arch v0.31.0 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/exp v0.0.0-20261005173118-76772065c9b0 // indirect
-	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/arch v0.32.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49 // indirect
+	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
