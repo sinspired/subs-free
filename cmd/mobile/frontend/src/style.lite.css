@@ -213,9 +213,9 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .available-pulse { font-size: 12px; font-family: monospace; font-weight: 600; color: var(--success); animation: pulse-success 2s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate; }
 
 .stats-grid { display: flex; margin-bottom: 10px; }
-.stat-item { flex: 1; background: var(--code-bg); border-radius: 12px; padding: 10px 2px; text-align: center; }
-.stat-item .val { display: block; font-size: 10px; font-family: monospace; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
-.stat-item .lbl { display: block; font-size: 10px; color: var(--text-sub); }
+.stat-item { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--code-bg); border-radius: 12px; padding: 10px 2px; text-align: center; min-width: 0; }
+.stat-item .val { width: 100%; display: block; font-size: 10px; font-family: monospace; font-weight: 800; color: var(--text-main); margin-bottom: 4px; height: 14px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.stat-item .lbl { display: block; font-size: 10px; color: var(--text-sub); height: 12px; line-height: 12px; white-space: nowrap; }
 
 .info-card { display: flex; flex-direction: column; padding-bottom: 16px; }
 .info-groups-wrapper { display: flex; flex-direction: column; }
