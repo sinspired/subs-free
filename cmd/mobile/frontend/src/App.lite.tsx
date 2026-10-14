@@ -124,6 +124,9 @@ export function App() {
   // 用户选择退出后置为 true：停止轮询，并且不再因为"切到后台"而重新拉起前台服务
   const exitingRef = useRef(false);
 
+  // 记录当前显示成功对号反馈的按钮 ID
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const pathRef = useRef<HTMLSpanElement>(null);
   const initTimerRef = useRef<number>();
 
@@ -833,7 +836,7 @@ export function App() {
   };
 
   // 工具函数
-  const copyText = async (text: string, name: string) => {
+  const copyText = async (text: string, name: string, id?: string) => {
     let success = false;
 
     // 1. 首选：现代 Web API
@@ -884,6 +887,15 @@ export function App() {
     triggerHaptic("selection");
     if (success) {
       showToast(`已复制 ${name}`, "success");
+
+      // 如果传入了 id，则触发短暂的状态变更
+      if (id) {
+        setCopiedId(id);
+        // 1秒后恢复原图标 (保护机制，防止没关弹窗的场景下一直卡在对号)
+        setTimeout(() => {
+          setCopiedId(current => current === id ? null : current);
+        }, 1000);
+      }
     } else {
       showToast(`复制失败，请尝试手动复制`, "error");
     }
@@ -1164,8 +1176,12 @@ export function App() {
                 <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }} title="显示/隐藏">
                   {keyShown ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>}
                 </button>
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥"); }} title="复制">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥", "apiKey"); }} title="复制">
+                  {copiedId === "apiKey" ? (
+                    <svg class="text-success icon-check-pop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -1221,13 +1237,17 @@ export function App() {
               { title: `singbox-${info?.singBoxLatestVer}`, url: `/api/file/singbox-${info?.singBoxLatestVer}`, img: "/static/icon/sing-box.svg" },
               { title: `singbox-${info?.singBoxExtraVer}`, url: `/api/file/singbox-${info?.singBoxExtraVer}`, img: "/static/icon/sing-box.svg" },
             ].map(item => (
-              <div class="list-item sub-copy" onClick={() => { copyText(getSubLink(item.url), item.title); }}>
+              <div class="list-item sub-copy" onClick={() => { copyText(getSubLink(item.url), item.title, `sub-${item.title}`); }}>
                 {item.img ? <img src={item.img} class="link-icon" /> : item.icon}
                 <span class="link-text">{item.title}</span>
                 <button class="share-link-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={(e: any) => { e.stopPropagation(); triggerHaptic("selection"); GuiApp.ShareLink(item.title, getSubLink(item.url)); }} title="分享到其他应用">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                 </button>
-                <svg class="link-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                {copiedId === `sub-${item.title}` ? (
+                  <svg class="link-copy-icon text-success icon-check-pop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ opacity: 1 }}><polyline points="20 6 9 17 4 12"></polyline></svg>
+                ) : (
+                  <svg class="link-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                )}
               </div>
             ))}
           </div>
@@ -1240,8 +1260,15 @@ export function App() {
           <div class="sheet-drag-handle"></div>
           <h3 class="sheet-title">配置文件路径</h3>
           <div class="path-full-box"><div class="path-full-text">{info?.configPath}</div></div>
-          <button class="btn-config-copy" onClick={() => { copyText(info!.configPath, "配置文件路径"); }}>
-            <span class="btn-text">复制路径</span>
+          <button class={`btn-config-copy ${copiedId === "configPath" ? "is-copied" : ""}`} onClick={() => { copyText(info!.configPath, "配置文件路径", "configPath"); }}>
+            {copiedId === "configPath" ? (
+              <Fragment>
+                <svg class="icon-check-pop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ width: '16px', height: '16px', marginRight: '6px' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span class="btn-text">已复制</span>
+              </Fragment>
+            ) : (
+              <span class="btn-text">复制路径</span>
+            )}
           </button>
         </div>
       </div>
