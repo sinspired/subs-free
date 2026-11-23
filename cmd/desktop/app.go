@@ -12,7 +12,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
+	ghprovider "github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 	"gopkg.in/yaml.v3"
+	"io"
 	"log/slog"
 	"net"
 	"net/url"
@@ -21,6 +23,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -42,9 +45,6 @@ type GuiApp struct {
 	loginClosing atomic.Bool
 	// webUISilentClose 为 true 时表示代码主动关闭 WebUI（如 BackToLogin / HideToTray），不重复触发再打开登录窗。
 	webUISilentClose atomic.Bool
-
-	// autostartMenuItem 托盘菜单中"开机自启"菜单项的引用。
-	autostartMenuItem *application.MenuItem
 
 	// pendingInit 为 true 时表示端口预检发现冲突，Initialize() 尚未调用。
 	pendingInit bool
@@ -73,8 +73,6 @@ type GuiApp struct {
 
 	// onTraySync 由 tray.go 注入，用于在窗口状态变更时立即刷新托盘菜单语义
 	onTraySync func()
-
-	silentAutostartMenuItem *application.MenuItem
 
 	autostartCached atomic.Bool
 }
@@ -839,7 +837,9 @@ func (g *GuiApp) GetAutoStartEnabled() (bool, error) {
 // ── GUI 偏好持久化（仅存轻量的自启偏好）──────────────────────────────────────
 
 type guiPrefs struct {
-	SilentAutostart bool `json:"silentAutostart"`
+	SilentAutostart   bool   `json:"silentAutostart"`
+	UpdaterToken      string `json:"updaterToken,omitempty"`
+	UpdaterPrerelease bool   `json:"updaterPrerelease"`
 }
 
 func guiPrefsPath() string {
@@ -890,60 +890,61 @@ func (g *GuiApp) GetSilentAutoStartEnabled() bool {
 	return loadGuiPrefs().SilentAutostart
 }
 
-// SetSilentAutoStart 切换「静默自启」；若开机自启已开启，立即覆盖系统自启注册项。
+// SetAutostartMode 统一设置自启开关与是否静默（供托盘子菜单调用）。
+func (g *GuiApp) SetAutostartMode(enabled, silent bool) error {
+	prefs := loadGuiPrefs()
+	if enabled {
+		prefs.SilentAutostart = silent
+		if err := saveGuiPrefs(prefs); err != nil {
+			return err
+		}
+	}
+	if err := g.applyAutostart(enabled, prefs.SilentAutostart); err != nil {
+		return err
+	}
+	g.autostartCached.Store(enabled)
+	g.NotifyAutostartChanged(enabled)
+	if g.onTraySync != nil {
+		application.InvokeAsync(g.onTraySync)
+	}
+	return nil
+}
+
+// SetSilentAutoStart 供前端开关调用，切换「静默自启」。
 func (g *GuiApp) SetSilentAutoStart(silent bool) error {
 	prefs := loadGuiPrefs()
 	prefs.SilentAutostart = silent
 	if err := saveGuiPrefs(prefs); err != nil {
 		return err
 	}
-
-	if g.silentAutostartMenuItem != nil {
-		g.silentAutostartMenuItem.SetChecked(silent)
-	}
-
 	if enabled, err := g.autostart.IsEnabled(); err == nil && enabled {
 		if err := g.applyAutostart(true, silent); err != nil {
 			return err
 		}
 	}
 	g.NotifyAutostartChanged(silent)
+	if g.onTraySync != nil {
+		application.InvokeAsync(g.onTraySync)
+	}
 	return nil
 }
 
-// SetAutoStart 供前端 JS 绑定调用，切换开机自启（联动控制托盘「静默自启」子选项显隐）。
+// SetAutoStart 供前端开关调用，切换「开机自启」。
 func (g *GuiApp) SetAutoStart(enabled bool) error {
 	silent := loadGuiPrefs().SilentAutostart
 	if err := g.applyAutostart(enabled, silent); err != nil {
 		return err
 	}
 	g.autostartCached.Store(enabled)
-	if g.autostartMenuItem != nil {
-		g.autostartMenuItem.SetChecked(enabled)
-	}
-	if g.silentAutostartMenuItem != nil {
-		g.silentAutostartMenuItem.SetHidden(!enabled)
-	}
 	if g.onTraySync != nil {
 		application.InvokeAsync(g.onTraySync)
 	}
 	return nil
 }
 
-// SetAutoStartEnabled 供托盘菜单内部调用，切换开机自启。
+// SetAutoStartEnabled 保留兼容旧调用。
 func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
-	silent := loadGuiPrefs().SilentAutostart
-	if err := g.applyAutostart(enable, silent); err != nil {
-		return err
-	}
-	g.autostartCached.Store(enable)
-	if g.silentAutostartMenuItem != nil {
-		g.silentAutostartMenuItem.SetHidden(!enable)
-	}
-	if g.onTraySync != nil {
-		application.InvokeAsync(g.onTraySync)
-	}
-	return nil
+	return g.SetAutoStart(enable)
 }
 
 // OpenInternalPage 在新窗口中打开内置 Web 页面（如 /files、/analysis）。
@@ -1475,4 +1476,113 @@ func (g *GuiApp) GetCheckState() CheckState {
 		ProxyCount: st.ProxyCount,
 		LastResult: g.backend.GetLastCheckResult(),
 	}
+}
+
+// ── 动态 GitHub 更新 Provider（突破 Updater.Init 单次限制，支持热更新配置）──────
+
+type dynamicGitHubProvider struct {
+	repo      string
+	mu        sync.Mutex
+	lastToken string
+	lastPre   bool
+	inner     wupdater.Provider
+}
+
+func newDynamicGitHubProvider(repo string) *dynamicGitHubProvider {
+	return &dynamicGitHubProvider{repo: repo}
+}
+
+func (p *dynamicGitHubProvider) Name() string {
+	return "github"
+}
+
+func (p *dynamicGitHubProvider) getProvider() (wupdater.Provider, error) {
+	prefs := loadGuiPrefs()
+
+	// 前端优先；前端未设置时回退到后端 config.yaml 中的 github-token
+	token := strings.TrimSpace(prefs.UpdaterToken)
+	if token == "" {
+		token = strings.TrimSpace(config.GlobalConfig.GithubToken)
+	}
+	prerelease := prefs.UpdaterPrerelease
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.inner != nil && p.lastToken == token && p.lastPre == prerelease {
+		return p.inner, nil
+	}
+
+	gh, err := ghprovider.New(ghprovider.Config{
+		Repository:    p.repo,
+		Token:         token,
+		Prerelease:    prerelease,
+		ChecksumAsset: "SHA256SUMS",
+		HTTPClient:    updater.NewHTTPClient(),
+		AssetMatcher:  updater.AssetMatcher,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	p.inner = gh
+	p.lastToken = token
+	p.lastPre = prerelease
+	return p.inner, nil
+}
+
+func (p *dynamicGitHubProvider) Check(ctx context.Context, req wupdater.CheckRequest) (*wupdater.Release, error) {
+	prov, err := p.getProvider()
+	if err != nil {
+		return nil, err
+	}
+	return prov.Check(ctx, req)
+}
+
+func (p *dynamicGitHubProvider) Download(ctx context.Context, r *wupdater.Release, dst io.Writer, onProgress func(written, total int64)) error {
+	prov, err := p.getProvider()
+	if err != nil {
+		return err
+	}
+	return prov.Download(ctx, r, dst, onProgress)
+}
+
+// UpdaterSettings 前端设置弹窗展示与保存所需的结构体。
+type UpdaterSettings struct {
+	Token           string `json:"token"`           // 前端设置的 Token（前端优先）
+	Prerelease      bool   `json:"prerelease"`      // 是否检测预览版
+	HasBackendToken bool   `json:"hasBackendToken"` // 后端是否配置了 github-token
+	EffectiveSource string `json:"effectiveSource"` // "frontend" | "backend" | "none"
+}
+
+// GetUpdaterSettings 返回当前更新器配置及 Token 生效来源（不向前端暴露后端明文 Token）。
+func (g *GuiApp) GetUpdaterSettings() UpdaterSettings {
+	prefs := loadGuiPrefs()
+	feToken := strings.TrimSpace(prefs.UpdaterToken)
+	beToken := strings.TrimSpace(config.GlobalConfig.GithubToken)
+
+	source := "none"
+	if feToken != "" {
+		source = "frontend"
+	} else if beToken != "" {
+		source = "backend"
+	}
+
+	return UpdaterSettings{
+		Token:           prefs.UpdaterToken,
+		Prerelease:      prefs.UpdaterPrerelease,
+		HasBackendToken: beToken != "",
+		EffectiveSource: source,
+	}
+}
+
+// SaveUpdaterSettings 持久化更新器配置（下次 Check/Download 自动热生效，重启不丢失）。
+func (g *GuiApp) SaveUpdaterSettings(token string, prerelease bool) (UpdaterSettings, error) {
+	prefs := loadGuiPrefs()
+	prefs.UpdaterToken = strings.TrimSpace(token)
+	prefs.UpdaterPrerelease = prerelease
+	if err := saveGuiPrefs(prefs); err != nil {
+		return UpdaterSettings{}, err
+	}
+	return g.GetUpdaterSettings(), nil
 }

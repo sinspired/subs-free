@@ -1832,3 +1832,148 @@ code {
   border-radius: 1px;
   background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+
+/* ── 更新器设置入口与弹窗 ────────────────────────────────────── */
+.bsm-arrow {
+  font-size: 14px;
+  color: var(--muted);
+  opacity: 0.65;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.upd-dialog {
+  width: min(350px, calc(100vw - 28px));
+  padding: 0;
+}
+
+.upd-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 15px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.upd-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.upd-desc {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.upd-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.upd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.upd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.upd-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.upd-source {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.upd-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.upd-input-wrap:focus-within {
+  border-color: var(--accent);
+}
+
+.upd-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  padding: 4px 0;
+}
+
+.upd-input::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.upd-eye-btn {
+  font-size: 11px;
+  padding: 3px 6px;
+  flex-shrink: 0;
+}
+
+.upd-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.upd-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upd-btn-secondary {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    border-color 0.14s;
+}
+
+.upd-btn-secondary:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.upd-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

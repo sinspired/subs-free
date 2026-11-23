@@ -13,7 +13,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 	"github.com/wailsapp/wails/v3/pkg/updater"
-	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
 //go:embed all:frontend/dist
@@ -72,27 +71,18 @@ func main() {
 		currentVer = "0.0.0"
 	}
 
-	ghProvider, ghErr := github.New(github.Config{
-		Repository:    "sinspired/subs-free",
-		ChecksumAsset: "SHA256SUMS",
-		HTTPClient:    guiupdater.NewHTTPClient(),
-		AssetMatcher:  guiupdater.AssetMatcher,
-	})
-
-	if ghErr != nil {
-		slog.Warn("Updater: 初始化 GitHub provider 失败", "error", ghErr)
+	ghProvider := newDynamicGitHubProvider("sinspired/subs-free")
+	if err := wailsApp.Updater.Init(updater.Config{
+		CurrentVersion: currentVer,
+		Providers:      []updater.Provider{ghProvider},
+		CheckInterval:  6 * time.Hour,
+		Window:         updater.WindowNone, // 不弹窗
+	}); err != nil {
+		slog.Warn("Updater: Init 失败", "error", err)
 	} else {
-		if err := wailsApp.Updater.Init(updater.Config{
-			CurrentVersion: currentVer,
-			Providers:      []updater.Provider{ghProvider},
-			CheckInterval:  6 * time.Hour,
-			Window:         updater.WindowNone,
-		}); err != nil {
-			slog.Warn("Updater: Init 失败", "error", err)
-		} else {
-			slog.Debug("Updater: 已初始化", "currentVersion", currentVer)
-		}
+		slog.Debug("Updater: 已初始化", "currentVersion", currentVer)
 	}
+
 	guiApp.updaterApp = wailsApp
 	guiApp.autostart = wailsApp.Autostart
 

@@ -25,7 +25,10 @@ type View = 'loading' | 'error' | 'portConflict' | 'main' | 'password' | 'about'
 
 // 在 Wails 无地址栏窗口中打开链接（不唤起系统浏览器）。
 // 若 Go 调用失败（极少情况），降级到系统浏览器作为兜底。
-async function openLink(url: string, windowSize: 'extraLarge' | 'large' | 'medium' | 'small' | 'tiny' | 'wide' = 'medium') {
+async function openLink(
+  url: string,
+  windowSize: 'extraLarge' | 'large' | 'medium' | 'small' | 'tiny' | 'wide' = 'medium',
+) {
   try {
     await GuiApp.OpenBrandURL(url, windowSize);
   } catch {
@@ -44,25 +47,54 @@ export function App() {
   const [errMsg, setErrMsg] = useState('');
   const [cfgPath, setCfgPath] = useState('');
   const [showQuit, setShowQuit] = useState(false);
+
+  // 自启与设置菜单状态
   const [autostartEnabled, setAutostart] = useState(false);
   const [silentAutostart, setSilentAutostart] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  // 当 Wails updater 检测到新版本时为 true（按钮高亮提示）
+
+  // 更新状态
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateVersion, setUpdateVersion] = useState('');
 
-  // ── Wails 就绪后立即拉取应用信息 ──────────────────────────────
+  // 更新器设置弹窗状态
+  const [showUpdaterModal, setShowUpdaterModal] = useState(false);
+  const [updaterPrerelease, setUpdaterPrerelease] = useState(false);
+  const [updaterToken, setUpdaterToken] = useState('');
+  const [updaterDraftPre, setUpdaterDraftPre] = useState(false);
+  const [updaterDraftToken, setUpdaterDraftToken] = useState('');
+  const [hasBackendToken, setHasBackendToken] = useState(false);
+  const [effectiveSource, setEffectiveSource] = useState<'frontend' | 'backend' | 'none'>('none');
+  const [showUpdaterToken, setShowUpdaterToken] = useState(false);
+  const [savingUpdater, setSavingUpdater] = useState(false);
+
+  async function syncUpdaterSettings() {
+    try {
+      const s = await GuiApp.GetUpdaterSettings();
+      setUpdaterToken(s.token || '');
+      setUpdaterPrerelease(!!s.prerelease);
+      setHasBackendToken(!!s.hasBackendToken);
+      setEffectiveSource((s.effectiveSource as 'frontend' | 'backend' | 'none') || 'none');
+      return s;
+    } catch {
+      return null;
+    }
+  }
+
+  // ── Wails 就绪后立即拉取应用信息与偏好设置 ─────────────────────
   useEffect(() => {
     if (!ready) return;
     loadAppInfo();
+    syncUpdaterSettings();
+
     GuiApp.GetAutoStartEnabled()
       .then(enabled => setAutostart(enabled))
-      .catch(() => { });
+      .catch(() => { /* 平台不支持时静默忽略 */ });
+
     GuiApp.GetSilentAutoStartEnabled()
       .then(silent => setSilentAutostart(silent))
-      .catch(() => { });
+      .catch(() => { /* 静默忽略 */ });
   }, [ready]);
-
 
   // ── 监听"窗口关闭"事件 ────────────────────────────────────────
   useEffect(() => {
@@ -73,6 +105,7 @@ export function App() {
     return () => { unsub && unsub(); };
   }, [ready]);
 
+  // ── 监听更新状态事件 ──────────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
 
@@ -105,17 +138,11 @@ export function App() {
       setUpdateVersion(rel.version ?? rel.Version ?? '');
     });
 
-    // 新增：监听 Go 端发来的检查结果 toast（已最新 / 出错 / 检查不可用）
     const unsubToast = Events.On('gui:update:toast', (event) => {
       const text = (event?.data as string) ?? '';
       if (text) toast(text);
     });
 
-    // 新增：监听后台静默检查（启动时 / 托盘每 4 小时一次）完成后推送的状态。
-    // 之前只在组件挂载时 GetUpdateStatus() 读一次缓存值，若此时后台检查
-    // （经代理访问 GitHub，耗时不定）还没跑完，就会读到"无更新"的初始值，
-    // 且之后再也不会刷新，导致徽标一直不出现。订阅这个事件后，无论检查
-    // 何时完成，前端都能收到最新结果。
     const unsubStatusChanged = Events.On('gui:update:status-changed', (event) => {
       const st: any = event?.data ?? {};
       setUpdateAvailable(!!(st.available ?? st.Available));
@@ -131,7 +158,7 @@ export function App() {
     };
   }, [ready]);
 
-  // ── 监听托盘「开机自启 / 静默自启」切换事件 ──
+  // ── 监听托盘「开机自启 / 静默自启」切换事件，回查真实状态 ─────
   useEffect(() => {
     if (!ready) return;
     const unsub = Events.On('autostart:changed', async () => {
@@ -142,21 +169,25 @@ export function App() {
         ]);
         setAutostart(actual);
         setSilentAutostart(silent);
-      } catch { /* 忽略 */ }
+      } catch { /* 平台不支持时静默忽略 */ }
     });
     return () => { unsub && unsub(); };
   }, [ready]);
 
-  // ── 点击外部或 Esc 自动关闭设置菜单 ──
+  // ── 点击外部或按 Esc 自动关闭设置菜单 / 更新器弹窗 ─────────────
   useEffect(() => {
-    if (!showSettings) return;
+    if (!showSettings && !showUpdaterModal) return;
     const onDown = (e: MouseEvent) => {
+      if (!showSettings) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('.brand-settings-menu') || t?.closest('.brand-settings-btn')) return;
       setShowSettings(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowSettings(false);
+      if (e.key === 'Escape') {
+        setShowSettings(false);
+        setShowUpdaterModal(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -164,16 +195,14 @@ export function App() {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [showSettings]);
+  }, [showSettings, showUpdaterModal]);
 
   async function loadAppInfo() {
     setView('loading');
     try {
       const data = await GuiApp.GetAppInfo();
 
-      // 尽早设置，让 useTheme 能拿到正确端口
       (window as any).__CORE_BASE_URL = `http://127.0.0.1:${data.listenPort}`;
-
       syncFromServer();
 
       setInfo(data);
@@ -189,32 +218,36 @@ export function App() {
   }
 
   function handlePortsFixed(newInfo: AppInfo) {
-    // // 端口已变更，更新全局 base URL，避免 useTheme 等钩子继续使用旧端口
     (window as any).__CORE_BASE_URL = `http://127.0.0.1:${newInfo.listenPort}`;
     syncFromServer();
+    syncUpdaterSettings();
     setInfo(newInfo);
     setView('main');
   }
 
-  function handleSelectConfig(path: string) { setCfgPath(path); setView('password'); }
+  function handleSelectConfig(path: string) {
+    setCfgPath(path);
+    setView('password');
+  }
+
   function handlePasswordDone(newInfo: AppInfo | null) {
     if (newInfo) {
-      // 新配置可能使用不同端口，必须更新 base URL，避免 useTheme 等钩子用旧端口访问
       (window as any).__CORE_BASE_URL = `http://127.0.0.1:${newInfo.listenPort}`;
       syncFromServer();
+      syncUpdaterSettings();
       setInfo(newInfo);
     }
     setView('main');
   }
+
   function handlePasswordBack() { setView('main'); }
-  function handlePasswordReselect(path: string) { setCfgPath(path); /* 保持 password 视图，只更新路径 */ }
+  function handlePasswordReselect(path: string) { setCfgPath(path); }
   const requestClose = () => setShowQuit(true);
 
   async function handleToggleAutostart() {
     const next = !autostartEnabled;
     try {
       await GuiApp.SetAutoStart(next);
-      // 回查确保前端与系统状态一致（托盘菜单下次点击时也会读取系统状态）
       const actual = await GuiApp.GetAutoStartEnabled();
       setAutostart(actual);
       toast(actual ? '已设置开机自启' : '已取消开机自启');
@@ -236,6 +269,36 @@ export function App() {
     }
   }
 
+  async function openUpdaterModal() {
+    setShowSettings(false);
+    const s = await syncUpdaterSettings();
+    setUpdaterDraftToken(s ? (s.token || '') : updaterToken);
+    setUpdaterDraftPre(s ? !!s.prerelease : updaterPrerelease);
+    setShowUpdaterToken(false);
+    setShowUpdaterModal(true);
+  }
+
+  async function handleSaveUpdaterSettings(checkNow = false) {
+    if (savingUpdater) return;
+    setSavingUpdater(true);
+    try {
+      const s = await GuiApp.SaveUpdaterSettings(updaterDraftToken, updaterDraftPre);
+      setUpdaterToken(s.token || '');
+      setUpdaterPrerelease(!!s.prerelease);
+      setHasBackendToken(!!s.hasBackendToken);
+      setEffectiveSource((s.effectiveSource as 'frontend' | 'backend' | 'none') || 'none');
+      setShowUpdaterModal(false);
+      toast('更新器设置已保存');
+      if (checkNow) {
+        await GuiApp.CheckForUpdates();
+      }
+    } catch (e: any) {
+      toast('保存失败：' + (e?.message ?? '未知错误'));
+    } finally {
+      setSavingUpdater(false);
+    }
+  }
+
   async function handleCheckForUpdates() {
     try {
       await GuiApp.CheckForUpdates();
@@ -244,7 +307,7 @@ export function App() {
     }
   }
 
-  // ── 左侧品牌面板（函数式渲染，避免开关菜单时重挂载 Logo）──────
+  // ── 左侧品牌面板（函数式渲染，避免切换菜单时重挂载 Logo）──────
   const renderBrandPanel = () => (
     <aside class="brand-panel">
       {/* 品牌主体：大 Logo */}
@@ -252,7 +315,7 @@ export function App() {
         <img src="/logo.svg" alt="logo" class="brand-icon" />
       </div>
 
-      {/* 选项弹出菜单（置于 brand-panel 内以完美居中不裁剪） */}
+      {/* 选项弹出菜单 */}
       {showSettings && (
         <div class="brand-settings-menu">
           <div class="bsm-item" onClick={handleToggleAutostart}>
@@ -266,12 +329,29 @@ export function App() {
           {autostartEnabled && (
             <div class="bsm-item bsm-sub-item" onClick={handleToggleSilentAutostart}>
               <div class="bsm-text">
-                <span class="bsm-title">静默自启</span>
-                <span class="bsm-sub">自启时隐藏窗口进托盘</span>
+                <span class="bsm-title">静默启动</span>
+                <span class="bsm-sub">自启时不显示窗口</span>
               </div>
               <span class={`bsm-switch${silentAutostart ? ' on' : ''}`} />
             </div>
           )}
+
+          <div class="bsm-divider" />
+
+          <button class="bsm-action" onClick={openUpdaterModal}>
+            <div class="bsm-text">
+              <span class="bsm-title">更新器设置</span>
+              <span class="bsm-sub">
+                {updaterPrerelease ? '预览版' : '稳定版'} ·{' '}
+                {effectiveSource === 'frontend'
+                  ? '前端 Token'
+                  : effectiveSource === 'backend'
+                    ? '后端 Token'
+                    : '未设 Token'}
+              </span>
+            </div>
+            <span class="bsm-arrow">›</span>
+          </button>
 
           <div class="bsm-divider" />
 
@@ -292,11 +372,11 @@ export function App() {
 
       {/* ── 底部工具行：设置 | github tg docker | 检查更新 */}
       <nav class="brand-links">
-        {/* 设置菜单按钮（含自启/静默/后台运行） */}
+        {/* 设置菜单按钮 */}
         <button
           class={`brand-autostart brand-settings-btn${showSettings ? ' open' : ''}${autostartEnabled ? ' active' : ''}`}
           onClick={() => setShowSettings(v => !v)}
-          title="启动与后台选项"
+          title="启动、更新器与后台选项"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -309,13 +389,25 @@ export function App() {
         <span class="brand-sep" />
 
         {/* 社交链接 */}
-        <a class="brand-link" onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro')} title="GitHub 仓库，欢迎 Star 和提 Issue">
+        <a
+          class="brand-link"
+          onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro')}
+          title="GitHub 仓库，欢迎 Star 和提 Issue"
+        >
           <img src="/github.svg" alt="GitHub" class="brand-social-icon" />
         </a>
-        <a class="brand-link" onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro', 'tiny')} title="Telegram 群组，建议加入以获取最新动态和使用帮助">
+        <a
+          class="brand-link"
+          onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://t.me/subs_check_pro', 'tiny')}
+          title="Telegram 群组，建议加入以获取最新动态和使用帮助"
+        >
           <img src="/telegram.svg" alt="Telegram" class="brand-social-icon" />
         </a>
-        <a class="brand-link" onClick={() => openLink('https://hub.docker.com/r/sinspired/subs-check-pro')} title="Docker Hub 仓库，提供官方镜像">
+        <a
+          class="brand-link"
+          onClick={() => openLink('https://hub.docker.com/r/sinspired/subs-check-pro')}
+          title="Docker Hub 仓库，提供官方镜像"
+        >
           <img src="/docker.svg" alt="Docker" class="brand-social-icon" />
         </a>
 
@@ -325,7 +417,9 @@ export function App() {
           title={updateAvailable ? `有可用更新${updateVersion ? ` (${updateVersion})` : ''}，点击安装` : '检查更新'}
           onClick={handleCheckForUpdates}
         >
-          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="15" height="15"><path d="M520.533 460.8l-179.2 170.667h358.4L520.533 460.8zm-52.906 170.65v204.817H290.133c-122.47 0-221.866-103.766-221.866-231.63 0-105.13 67.003-193.62 158.856-222.344C275.046 267.861 384.65 187.733 512 187.733s236.954 80.128 284.877 194.56C888.73 410.54 955.733 499.49 955.733 604.638c0 127.863-99.396 231.629-221.866 231.629H556.373V631.45" fill="currentColor" /></svg>
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="15" height="15">
+            <path d="M520.533 460.8l-179.2 170.667h358.4L520.533 460.8zm-52.906 170.65v204.817H290.133c-122.47 0-221.866-103.766-221.866-231.63 0-105.13 67.003-193.62 158.856-222.344C275.046 267.861 384.65 187.733 512 187.733s236.954 80.128 284.877 194.56C888.73 410.54 955.733 499.49 955.733 604.638c0 127.863-99.396 231.629-221.866 231.629H556.373V631.45" fill="currentColor" />
+          </svg>
         </button>
       </nav>
     </aside>
@@ -334,7 +428,6 @@ export function App() {
   // ── 右侧顶部工具栏：左侧端口状态 + 拖拽区 + 右侧主题切换 ──
   const PanelToolbar = ({ portInfo }: { portInfo?: AppInfo | null }) => (
     <div class="lp-toolbar">
-      {/* 左侧：端口状态（有 info 时显示） */}
       {portInfo && (
         <div class="lp-ports">
           <span class="port-badge">
@@ -352,10 +445,8 @@ export function App() {
         </div>
       )}
 
-      {/* 拖拽区（弹性填充） */}
       <div class="lp-drag-area" />
 
-      {/* 右侧：主题切换 */}
       <button class="icon-btn theme-btn" onClick={toggleTheme} title="切换主题">
         {!isDark ? (
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -380,7 +471,7 @@ export function App() {
     </div>
   );
 
-  // ── 右侧底栏：ⓘ 关于按钮 + 版本标签，水平居中，与左侧 brand-links 垂直对齐 ──
+  // ── 右侧底栏：版本标签 ──
   const LpFooter = () => {
     if (!info) return <div class="lp-footer" />;
     return (
@@ -431,7 +522,7 @@ export function App() {
         </div>
       )}
 
-      {/* ── portConflict — 左右分栏布局（与 main/password 视图保持一致的窗口感）── */}
+      {/* ── portConflict ── */}
       {view === 'portConflict' && info && (
         <div class="page split-page">
           {renderBrandPanel()}
@@ -445,7 +536,7 @@ export function App() {
         </div>
       )}
 
-      {/* ── main — 左右分栏布局 ── */}
+      {/* ── main ── */}
       {view === 'main' && info && (
         <div class="page split-page">
           {renderBrandPanel()}
@@ -459,7 +550,7 @@ export function App() {
         </div>
       )}
 
-      {/* ── password — 左右分栏布局 ── */}
+      {/* ── password ── */}
       {view === 'password' && (
         <div class="page split-page">
           {renderBrandPanel()}
@@ -483,6 +574,100 @@ export function App() {
 
       {showQuit && (
         <QuitDialog onClose={() => setShowQuit(false)} />
+      )}
+
+      {showUpdaterModal && (
+        <div
+          class="quit-overlay"
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowUpdaterModal(false);
+          }}
+        >
+          <div class="quit-dialog upd-dialog">
+            <div class="upd-header">
+              <span class="upd-title">更新器设置</span>
+              <span class="upd-desc">配置 GUI 检查更新通道与 GitHub Token</span>
+            </div>
+
+            <div class="upd-body">
+              <div class="upd-row" onClick={() => setUpdaterDraftPre(v => !v)}>
+                <div class="bsm-text">
+                  <span class="bsm-title">检测预览版</span>
+                  <span class="bsm-sub">包含 alpha / beta / rc 预发布版本</span>
+                </div>
+                <span class={`bsm-switch${updaterDraftPre ? ' on' : ''}`} />
+              </div>
+
+              <div class="upd-field">
+                <div class="upd-field-head">
+                  <span class="bsm-title">GitHub Token</span>
+                  <span class="upd-source">
+                    {updaterDraftToken.trim()
+                      ? '将使用前端设置（优先）'
+                      : hasBackendToken
+                        ? '留空将使用后端 config.yaml'
+                        : '留空则匿名请求（易受限流）'}
+                  </span>
+                </div>
+                <div class="upd-input-wrap">
+                  <input
+                    class="upd-input"
+                    type={showUpdaterToken ? 'text' : 'password'}
+                    value={updaterDraftToken}
+                    onInput={e => setUpdaterDraftToken((e.target as HTMLInputElement).value)}
+                    placeholder={hasBackendToken ? '已继承后端 Token，输入可覆盖' : 'ghp_... / github_pat_...'}
+                    spellcheck={false}
+                    autocomplete="off"
+                  />
+                  <button
+                    type="button"
+                    class="icon-btn upd-eye-btn"
+                    onClick={() => setShowUpdaterToken(v => !v)}
+                    title={showUpdaterToken ? '隐藏 Token' : '显示 Token'}
+                  >
+                    {showUpdaterToken ? '隐藏' : '显示'}
+                  </button>
+                  {updaterDraftToken && (
+                    <button
+                      type="button"
+                      class="icon-btn upd-eye-btn"
+                      onClick={() => setUpdaterDraftToken('')}
+                      title="清空前端覆盖（回退后端或匿名）"
+                    >
+                      清空
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div class="upd-footer">
+              <button
+                class="quit-cancel"
+                onClick={() => setShowUpdaterModal(false)}
+                disabled={savingUpdater}
+              >
+                取消
+              </button>
+              <div class="upd-footer-right">
+                <button
+                  class="upd-btn-secondary"
+                  onClick={() => handleSaveUpdaterSettings(true)}
+                  disabled={savingUpdater}
+                >
+                  保存并检查
+                </button>
+                <button
+                  class="btn-small"
+                  onClick={() => handleSaveUpdaterSettings(false)}
+                  disabled={savingUpdater}
+                >
+                  {savingUpdater ? '保存中…' : '保存'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

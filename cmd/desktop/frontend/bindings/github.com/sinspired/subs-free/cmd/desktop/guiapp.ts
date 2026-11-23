@@ -121,6 +121,13 @@ export function GetUpdateStatus(): $CancellablePromise<updater$0.UpdateStatus> {
 }
 
 /**
+ * GetUpdaterSettings 返回当前更新器配置及 Token 生效来源（不向前端暴露后端明文 Token）。
+ */
+export function GetUpdaterSettings(): $CancellablePromise<$models.UpdaterSettings> {
+    return $Call.ByID(2157599318);
+}
+
+/**
  * HideToTray 关闭所有窗口进入纯后台模式，仅保留核心服务在托盘运行。
  */
 export function HideToTray(): $CancellablePromise<void> {
@@ -205,17 +212,31 @@ export function QuitApp(): $CancellablePromise<void> {
 }
 
 /**
- * SetAutoStart 供前端 JS 绑定调用，切换开机自启（联动控制托盘「静默自启」子选项显隐）。
+ * SaveUpdaterSettings 持久化更新器配置（下次 Check/Download 自动热生效，重启不丢失）。
+ */
+export function SaveUpdaterSettings(token: string, prerelease: boolean): $CancellablePromise<$models.UpdaterSettings> {
+    return $Call.ByID(2189635229, token, prerelease);
+}
+
+/**
+ * SetAutoStart 供前端开关调用，切换「开机自启」。
  */
 export function SetAutoStart(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(940964243, enabled);
 }
 
 /**
- * SetAutoStartEnabled 供托盘菜单内部调用，切换开机自启。
+ * SetAutoStartEnabled 保留兼容旧调用。
  */
 export function SetAutoStartEnabled(enable: boolean): $CancellablePromise<void> {
     return $Call.ByID(197427528, enable);
+}
+
+/**
+ * SetAutostartMode 统一设置自启开关与是否静默（供托盘子菜单调用）。
+ */
+export function SetAutostartMode(enabled: boolean, silent: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1174242716, enabled, silent);
 }
 
 /**
@@ -226,7 +247,7 @@ export function SetPorts(httpPort: string, subStorePort: string): $CancellablePr
 }
 
 /**
- * SetSilentAutoStart 切换「静默自启」；若开机自启已开启，立即覆盖系统自启注册项。
+ * SetSilentAutoStart 供前端开关调用，切换「静默自启」。
  */
 export function SetSilentAutoStart(silent: boolean): $CancellablePromise<void> {
     return $Call.ByID(1589259424, silent);

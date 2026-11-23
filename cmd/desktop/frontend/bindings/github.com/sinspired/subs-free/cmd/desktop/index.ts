@@ -12,5 +12,6 @@ export type {
     AppInfo,
     CheckState,
     TrayWindowState,
-    UpdateInfo
+    UpdateInfo,
+    UpdaterSettings
 } from "./models.js";

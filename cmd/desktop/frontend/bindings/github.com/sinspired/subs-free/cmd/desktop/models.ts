@@ -64,3 +64,28 @@ export interface UpdateInfo {
     "filetype": string;
     "assetSize": string;
 }
+
+/**
+ * UpdaterSettings 前端设置弹窗展示与保存所需的结构体。
+ */
+export interface UpdaterSettings {
+    /**
+     * 前端设置的 Token（前端优先）
+     */
+    "token": string;
+
+    /**
+     * 是否检测预览版
+     */
+    "prerelease": boolean;
+
+    /**
+     * 后端是否配置了 github-token
+     */
+    "hasBackendToken": boolean;
+
+    /**
+     * "frontend" | "backend" | "none"
+     */
+    "effectiveSource": string;
+}
