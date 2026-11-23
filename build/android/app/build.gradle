@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.wails.app'
-    compileSdk 35
+    compileSdk 36
 
     buildFeatures {
         buildConfig = true
@@ -13,7 +13,7 @@ android {
     defaultConfig {
         applicationId "com.sinspired.subs_free"
         minSdk 21
-        targetSdk 35
+        targetSdk 36
         // versionCode/versionName 通过 Task 在调用 gradlew 时用
         // -PappVersionCode=... -PappVersionName=... 传入（见
         // build/android/Taskfile.yml 里的 assemble:* 任务），来源和

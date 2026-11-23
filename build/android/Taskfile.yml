@@ -10,7 +10,7 @@ includes:
 vars:
   APP_ID: '{{.APP_ID | default "com.sinspired.subs_free"}}'
   MIN_SDK: '21'
-  TARGET_SDK: '35'
+  TARGET_SDK: '36'
   # The emulator runs the host architecture; physical devices are arm64
   HOST_ARCH:
     sh: '{{if eq .OS "windows"}}echo amd64{{else}}[ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64"{{end}}'
@@ -423,8 +423,8 @@ tasks:
           else
             echo "No Android Virtual Devices found, and no system image is installed to create one from."
             echo "Install a system image and create an AVD, e.g.:"
-            echo "  sdkmanager 'system-images;android-35;google_apis;$ABI'"
-            echo "  avdmanager create avd --name wails --package 'system-images;android-35;google_apis;$ABI' --device pixel_7"
+            echo "  sdkmanager 'system-images;android-36;google_apis;$ABI'"
+            echo "  avdmanager create avd --name wails --package 'system-images;android-36;google_apis;$ABI' --device pixel_7"
             exit 1
           fi
         fi

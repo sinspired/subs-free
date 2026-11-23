@@ -128,7 +128,7 @@ func main() {
 		fmt.Println("Setup instructions:")
 		fmt.Println("1. Install Android Studio: https://developer.android.com/studio")
 		fmt.Println("2. Open SDK Manager and install:")
-		fmt.Println("   - Android SDK Platform (API 35)")
+		fmt.Println("   - Android SDK Platform (API 36)")
 		fmt.Println("   - Android SDK Build-Tools")
 		fmt.Println("   - Android SDK Platform-Tools")
 		fmt.Println("   - Android Emulator")
@@ -166,7 +166,7 @@ func offerCreateAVD(androidHome string) {
 
 	// Find the highest-API installed system image matching the host ABI.
 	// The API level must be compared numerically: lexicographic sorting
-	// would rank android-9 above android-35.
+	// would rank android-9 above android-36.
 	var img string
 	if androidHome != "" {
 		matches, _ := filepath.Glob(filepath.Join(androidHome, "system-images", "android-*", "*", abi))
@@ -175,7 +175,7 @@ func offerCreateAVD(androidHome string) {
 			apiDir := filepath.Base(filepath.Dir(filepath.Dir(m)))
 			api, err := strconv.Atoi(strings.TrimPrefix(apiDir, "android-"))
 			if err != nil {
-				continue // preview/extension images (e.g. android-35-ext14)
+				continue // preview/extension images (e.g. android-36-ext14)
 			}
 			if api > bestAPI {
 				bestAPI = api
@@ -189,14 +189,14 @@ func offerCreateAVD(androidHome string) {
 	if img == "" || avdmanager == "" {
 		fmt.Println("⚠ No Android Virtual Devices found.")
 		fmt.Println("   Install a system image and create an AVD, e.g.:")
-		fmt.Printf("     sdkmanager 'system-images;android-35;google_apis;%s'\n", abi)
-		fmt.Printf("     avdmanager create avd --name wails --package 'system-images;android-35;google_apis;%s' --device pixel_7\n", abi)
+		fmt.Printf("     sdkmanager 'system-images;android-36;google_apis;%s'\n", abi)
+		fmt.Printf("     avdmanager create avd --name wails --package 'system-images;android-36;google_apis;%s' --device pixel_7\n", abi)
 		return
 	}
 
 	// Derive the package path from the installed image directory, e.g.
-	//   <sdk>/system-images/android-35/google_apis/arm64-v8a
-	//   -> system-images;android-35;google_apis;arm64-v8a
+	//   <sdk>/system-images/android-36/google_apis/arm64-v8a
+	//   -> system-images;android-36;google_apis;arm64-v8a
 	rel := strings.TrimPrefix(img, filepath.Join(androidHome, "system-images")+string(os.PathSeparator))
 	pkg := "system-images;" + strings.ReplaceAll(rel, string(os.PathSeparator), ";")
 
