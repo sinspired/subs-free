@@ -132,11 +132,7 @@ func startSysTray(
 	})
 
 	tray.OnClick(func() {
-		if windowVisible.Load() {
-			guiApp.hideActiveWindow()
-		} else {
-			guiApp.showActiveWindow()
-		}
+		guiApp.ToggleFromTray()
 	})
 
 	tray.OnDoubleClick(func() {
@@ -166,21 +162,66 @@ func buildTrayMenu(
 
 	menu.AddSeparator()
 
-	menu.Add("显示主界面").OnClick(func(_ *application.Context) {
-		guiApp.showActiveWindow()
+	toggleWinItem := menu.Add("打开登录窗口")
+	toggleWinItem.OnClick(func(_ *application.Context) {
+		guiApp.ToggleFromTray()
 	})
 
-	menu.Add("隐藏主界面").OnClick(func(_ *application.Context) {
-		guiApp.hideActiveWindow()
-		sendOSNotification("Subs Free", "已最小化到系统托盘\n单击图标可恢复窗口")
+	bgRunItem := menu.Add("后台运行（关闭界面）")
+	bgRunItem.OnClick(func(_ *application.Context) {
+		guiApp.HideToTray()
 	})
 
-	menu.AddSeparator()
-
-	menu.Add("返回登录窗口").OnClick(func(_ *application.Context) {
+	backLoginItem := menu.Add("返回登录窗口")
+	backLoginItem.OnClick(func(_ *application.Context) {
 		guiApp.BackToLogin()
-		sendOSNotification("Subs Free", "已返回登录窗口")
 	})
+
+	// 同步托盘菜单语义（仅在状态变化时调用 menu.Update()，避免无谓重建 Windows 菜单）
+	var lastMenuKey string
+	syncTrayMenu := func() {
+		st := guiApp.GetTrayWindowState()
+		key := fmt.Sprintf("%s:%v", st.Mode, st.IsVisible)
+		if key == lastMenuKey {
+			return
+		}
+		lastMenuKey = key
+
+		switch st.Mode {
+		case "background":
+			toggleWinItem.SetLabel("打开登录窗口")
+			toggleWinItem.SetHidden(false)
+			bgRunItem.SetHidden(true)
+			backLoginItem.SetHidden(true)
+
+		case "login":
+			if st.IsVisible {
+				toggleWinItem.SetLabel("最小化到任务栏")
+			} else {
+				toggleWinItem.SetLabel("恢复登录窗口")
+			}
+			toggleWinItem.SetHidden(false)
+			bgRunItem.SetLabel("后台运行（关闭界面）")
+			bgRunItem.SetHidden(false)
+			backLoginItem.SetHidden(true)
+
+		case "webui":
+			if st.IsVisible {
+				toggleWinItem.SetLabel("最小化到托盘")
+			} else {
+				toggleWinItem.SetLabel("恢复管理面板")
+			}
+			toggleWinItem.SetHidden(false)
+			bgRunItem.SetLabel("后台运行（释放界面）")
+			bgRunItem.SetHidden(false)
+			backLoginItem.SetHidden(false)
+		}
+
+		menu.Update()
+	}
+
+	guiApp.onTraySync = syncTrayMenu
+	application.InvokeAsync(syncTrayMenu)
 
 	menu.AddSeparator()
 
@@ -321,7 +362,9 @@ func buildTrayMenu(
 		ticker := time.NewTicker(1000 * time.Millisecond)
 		defer ticker.Stop()
 
-		for range ticker.C {
+for range ticker.C {
+			application.InvokeAsync(syncTrayMenu)
+
 			if updateTooltip != nil {
 				updateTooltip()
 			}

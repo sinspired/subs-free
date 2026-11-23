@@ -59,6 +59,7 @@ func registerGuiRoutes(router *gin.Engine) {
 	router.GET("/gui/open-sub-links", handleGuiOpenSubLinks)
 	router.GET("/gui/open-sub-store", handleGuiOpenSubStore)
 	router.GET("/gui/check-update", handleGuiCheckUpdate)
+	router.GET("/gui/hide-to-tray", handleGuiHideToTray)
 }
 
 // handleGuiEnter 一次性自动登录中转路由：验证 nonce → 写 session → 跳转 /admin。
@@ -282,5 +283,17 @@ func handleGuiCheckUpdate(c *gin.Context) {
 	c.String(http.StatusOK, "ok")
 	if globalGuiApp != nil {
 		go globalGuiApp.CheckForUpdates()
+	}
+}
+
+// handleGuiHideToTray 销毁所有窗口，使应用仅在系统托盘后台运行。
+func handleGuiHideToTray(c *gin.Context) {
+	if !isLoopback(c) {
+		c.String(http.StatusForbidden, "forbidden")
+		return
+	}
+	c.String(http.StatusOK, "ok")
+	if globalGuiApp != nil {
+		globalGuiApp.HideToTray()
 	}
 }

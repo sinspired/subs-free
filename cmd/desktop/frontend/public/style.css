@@ -933,36 +933,58 @@ code {
   /* 不加任何光晕或阴影，让 logo 在黑暗中自然呈现 */
 }
 
-/* ── 社交链接行（含开机自启 + 竖线分割） ── */
+/* ── 社交链接行（含开机自启 + 后台运行 + 竖线分割） ── */
 .brand-links {
   display: flex;
-  gap: 10px;
+  gap: 7px;
   align-items: center;
   padding-bottom: 2px;
+  -webkit-app-region: no-drag;
 }
 
-/* 开机自启图标按钮 */
+/* 开机自启 / 后台运行 / 检查更新图标按钮 */
 .brand-autostart {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
   background: none;
   border: none;
-  padding: 4px;
+  padding: 0;
   border-radius: 5px;
   cursor: pointer;
   color: var(--muted);
-  opacity: 0.45;
+  opacity: 0.55;
+  -webkit-app-region: no-drag;
   transition:
     color 0.2s,
     background 0.2s,
     opacity 0.2s;
   flex-shrink: 0;
 }
+
+.brand-autostart .brand-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex-shrink: 0;
+}
+
 .brand-autostart:hover {
   color: var(--fg);
   opacity: 1;
   background: var(--border);
+}
+
+.brand-autostart.active {
+  color: #4ade80;
+  opacity: 0.9;
+}
+
+.brand-autostart.active:hover {
+  color: #86efac;
+  opacity: 1;
 }
 /* 开启态：用绿色高亮，不用 accent */
 .brand-autostart.active {
@@ -1023,6 +1045,7 @@ code {
   transition: opacity 0.2s;
   border-radius: 5px;
   padding: 4px;
+  -webkit-app-region: no-drag;
 }
 .brand-link:hover {
   opacity: 0.72;

@@ -96,6 +96,13 @@ export function GetListenPort(): $CancellablePromise<string> {
 }
 
 /**
+ * GetTrayWindowState 必须在主线程调用，返回真实窗口状态。
+ */
+export function GetTrayWindowState(): $CancellablePromise<$models.TrayWindowState> {
+    return $Call.ByID(297840055);
+}
+
+/**
  * GetUpdateInfo 通过 Wails 内置更新器查询更新状态，返回给前端。
  */
 export function GetUpdateInfo(): $CancellablePromise<$models.UpdateInfo> {
@@ -107,7 +114,7 @@ export function GetUpdateStatus(): $CancellablePromise<updater$0.UpdateStatus> {
 }
 
 /**
- * HideToTray 供登录窗"关闭确认对话框"选择「收进系统托盘」时调用：销毁登录窗，只留托盘与内核后台运行。
+ * HideToTray 关闭所有窗口进入纯后台模式，仅保留核心服务在托盘运行。
  */
 export function HideToTray(): $CancellablePromise<void> {
     return $Call.ByID(171980759);
@@ -223,6 +230,13 @@ export function ShowWindow(): $CancellablePromise<void> {
  */
 export function SwitchConfigFile(path: string, enteredKey: string): $CancellablePromise<$models.AppInfo> {
     return $Call.ByID(3083586062, path, enteredKey);
+}
+
+/**
+ * ToggleFromTray 托盘图标/主菜单项单击切换逻辑：根据真实窗口状态精确切换。
+ */
+export function ToggleFromTray(): $CancellablePromise<void> {
+    return $Call.ByID(2245221670);
 }
 
 /**

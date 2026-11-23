@@ -34,6 +34,21 @@ export interface CheckState {
 }
 
 /**
+ * TrayWindowState 描述当前窗口与界面所处真实状态，供托盘菜单和单击切换使用。
+ */
+export interface TrayWindowState {
+    /**
+     * "background" | "login" | "webui"
+     */
+    "Mode": string;
+
+    /**
+     * 窗口当前是否可见且未最小化
+     */
+    "IsVisible": boolean;
+}
+
+/**
  * UpdateInfo 前端展示更新状态所需的结构体。
  */
 export interface UpdateInfo {

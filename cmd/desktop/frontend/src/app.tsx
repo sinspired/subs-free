@@ -216,18 +216,50 @@ export function App() {
         <img src="/logo.svg" alt="logo" class="brand-icon" />
       </div>
 
-      {/* ── 底部工具行：开机自启 | 竖线 | github | tg | docker | 竖线 | 🔄 检查更新 */}
+      {/* ── 底部工具行：开机自启 后台运行 | github tg docker | 检查更新 */}
       <nav class="brand-links">
-        {/* 开机自启图标按钮 */}
+        {/* 开机自启 */}
         <button
           class={`brand-autostart${autostartEnabled ? ' active' : ''}`}
           onClick={handleToggleAutostart}
           title={autostartEnabled ? '开机自启：已开启（点击关闭）' : '开机自启：已关闭（点击开启）'}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="brand-icon"
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
             <line x1="12" y1="2" x2="12" y2="12" />
+          </svg>
+        </button>
+
+        {/* 后台运行 */}
+        <button
+          class="brand-autostart"
+          onClick={() => GuiApp.HideToTray()}
+          title="后台运行（隐藏窗口，仅保留托盘与内核服务）"
+        >
+          <svg
+            class="brand-icon"
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
 
@@ -245,10 +277,7 @@ export function App() {
           <img src="/docker.svg" alt="Docker" class="brand-social-icon" />
         </a>
 
-        {/* 竖线分割 */}
-        {/* <span class="brand-sep" /> */}
-
-        {/* 🔄 检查更新按钮（替换原关于按钮位置） */}
+        {/* 检查更新按钮 */}
         <button
           class={`brand-autostart${updateAvailable ? ' update-available' : ''}`}
           title={updateAvailable ? `有可用更新${updateVersion ? ` (${updateVersion})` : ''}，点击安装` : '检查更新'}

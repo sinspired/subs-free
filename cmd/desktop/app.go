@@ -69,6 +69,9 @@ type GuiApp struct {
 
 	// checkingUpdate 防止用户连续快速点击"检查更新"图标
 	checkingUpdate atomic.Bool
+
+	// onTraySync 由 tray.go 注入，用于在窗口状态变更时立即刷新托盘菜单语义
+	onTraySync func()
 }
 
 // AppInfo 前端展示所需的应用运行信息。
@@ -143,6 +146,9 @@ func (g *GuiApp) createLoginWindow() {
 		g.loginWin.Show()
 		g.loginWin.Focus()
 		windowVisible.Store(true)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
 		return
 	}
 
@@ -178,12 +184,15 @@ func (g *GuiApp) createLoginWindow() {
 	g.loginWin = win
 	windowVisible.Store(true)
 
-	// 点击登录窗口 ×：拦截并弹出 QuitDialog，由用户选择「退出」或「收进系统托盘」
+	// 点击登录窗口 ×：拦截并弹出 QuitDialog，由用户选择「退出」或「后台运行」
 	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		if g.loginClosing.CompareAndSwap(true, false) {
 			g.loginWin = nil
 			if g.webUIWin == nil || !g.webUIWin.IsVisible() {
 				windowVisible.Store(false)
+			}
+			if g.onTraySync != nil {
+				g.onTraySync()
 			}
 			return
 		}
@@ -191,11 +200,41 @@ func (g *GuiApp) createLoginWindow() {
 		win.EmitEvent("window:close-requested", nil)
 	})
 
-	// 登录窗口点最小化：直接销毁登录窗收进托盘省内存，点击托盘重新打开
+	// 保留登录窗口原生最小化到任务栏，仅同步托盘菜单文案
 	win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-		g.closeLoginWindow()
-		sendOSNotification("Subs Check PRO GUI", "登录窗口已最小化到系统托盘")
+		windowVisible.Store(false)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
 	})
+	win.OnWindowEvent(events.Common.WindowUnMinimise, func(e *application.WindowEvent) {
+		windowVisible.Store(true)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+	win.OnWindowEvent(events.Common.WindowRestore, func(e *application.WindowEvent) {
+		windowVisible.Store(true)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+	win.OnWindowEvent(events.Common.WindowShow, func(e *application.WindowEvent) {
+		windowVisible.Store(true)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+	win.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
+		windowVisible.Store(false)
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+
+	if g.onTraySync != nil {
+		g.onTraySync()
+	}
 }
 
 // openLoginWindow 从任意 goroutine 安全唤起登录窗口。
@@ -308,6 +347,12 @@ func (g *GuiApp) EnterWebUI() {
 			win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 				g.webUIWin = nil
 				g.inWebUI.Store(false)
+				if g.loginWin == nil {
+					windowVisible.Store(false)
+				}
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 				if g.webUISilentClose.CompareAndSwap(true, false) {
 					return
 				}
@@ -318,24 +363,39 @@ func (g *GuiApp) EnterWebUI() {
 			win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
 				hideWindow(win)
 				sendOSNotification("Subs Check PRO", "管理界面已最小化到系统托盘，点击托盘图标可恢复")
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 			})
 
-			// 同步隐藏/显示状态给前端，确保最小化到托盘期间零后台轮询、不泄露内存
+			// 同步隐藏/显示状态给前端与托盘，确保最小化到托盘期间零后台轮询
 			win.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
 				windowVisible.Store(false)
 				win.EmitEvent("webui:visibility", false)
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 			})
 			win.OnWindowEvent(events.Common.WindowShow, func(e *application.WindowEvent) {
 				windowVisible.Store(true)
 				win.EmitEvent("webui:visibility", true)
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 			})
 			win.OnWindowEvent(events.Common.WindowUnMinimise, func(e *application.WindowEvent) {
 				windowVisible.Store(true)
 				win.EmitEvent("webui:visibility", true)
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 			})
 			win.OnWindowEvent(events.Common.WindowRestore, func(e *application.WindowEvent) {
 				windowVisible.Store(true)
 				win.EmitEvent("webui:visibility", true)
+				if g.onTraySync != nil {
+					g.onTraySync()
+				}
 			})
 
 			win.Show()
@@ -347,6 +407,10 @@ func (g *GuiApp) EnterWebUI() {
 		if g.loginWin != nil {
 			g.loginClosing.Store(true)
 			g.loginWin.Close()
+		}
+
+		if g.onTraySync != nil {
+			g.onTraySync()
 		}
 	})
 }
@@ -581,11 +645,107 @@ func (g *GuiApp) ShowWindow() {
 	g.openLoginWindow()
 }
 
-// HideToTray 供登录窗"关闭确认对话框"选择「收进系统托盘」时调用：销毁登录窗，只留托盘与内核后台运行。
+// TrayWindowState 描述当前窗口与界面所处真实状态，供托盘菜单和单击切换使用。
+type TrayWindowState struct {
+	Mode      string // "background" | "login" | "webui"
+	IsVisible bool   // 窗口当前是否可见且未最小化
+}
+
+// GetTrayWindowState 必须在主线程调用，返回真实窗口状态。
+func (g *GuiApp) GetTrayWindowState() TrayWindowState {
+	if g.inWebUI.Load() && g.webUIWin != nil {
+		vis := g.webUIWin.IsVisible() && !g.webUIWin.IsMinimised()
+		return TrayWindowState{Mode: "webui", IsVisible: vis}
+	}
+	if g.loginWin != nil {
+		vis := g.loginWin.IsVisible() && !g.loginWin.IsMinimised()
+		return TrayWindowState{Mode: "login", IsVisible: vis}
+	}
+	return TrayWindowState{Mode: "background", IsVisible: false}
+}
+
+// ToggleFromTray 托盘图标/主菜单项单击切换逻辑：根据真实窗口状态精确切换。
+func (g *GuiApp) ToggleFromTray() {
+	application.InvokeAsync(func() {
+		st := g.GetTrayWindowState()
+		slog.Debug("托盘单击触发", "mode", st.Mode, "isVisible", st.IsVisible)
+
+		switch st.Mode {
+		case "webui":
+			if st.IsVisible {
+				hideWindow(g.webUIWin)
+			} else {
+				showWindow(g.webUIWin)
+			}
+		case "login":
+			if st.IsVisible {
+				g.loginWin.Minimise()
+			} else {
+				if g.loginWin.IsMinimised() {
+					g.loginWin.UnMinimise()
+				}
+				g.loginWin.Show()
+				g.loginWin.Focus()
+				windowVisible.Store(true)
+			}
+		default: // "background"
+			g.inWebUI.Store(false)
+			g.createLoginWindow()
+		}
+
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+}
+
+// HideToTray 关闭所有窗口进入纯后台模式，仅保留核心服务在托盘运行。
 func (g *GuiApp) HideToTray() {
 	g.inWebUI.Store(false)
-	g.closeLoginWindow()
-	sendOSNotification("Subs Check PRO", "GUI已收进系统托盘，后台持续运行")
+	application.InvokeAsync(func() {
+		if g.webUIWin != nil {
+			g.webUISilentClose.Store(true)
+			g.webUIWin.Close()
+		}
+		if g.loginWin != nil {
+			g.loginClosing.Store(true)
+			g.loginWin.Close()
+		}
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+	sendOSNotification("Subs Check PRO", "已关闭界面窗口，核心服务在后台持续运行\n点击系统托盘图标可重新打开")
+}
+
+// showActiveWindow 恢复/唤起当前主窗口（WebUI 最小化进托盘则恢复原 WebUI，否则打开登录窗口）。
+func (g *GuiApp) showActiveWindow() {
+	application.InvokeAsync(func() {
+		if g.inWebUI.Load() && g.webUIWin != nil {
+			showWindow(g.webUIWin)
+		} else {
+			g.inWebUI.Store(false)
+			g.createLoginWindow()
+		}
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
+}
+
+// hideActiveWindow 将当前活动窗口收进托盘：WebUI 保留状态并休眠前端；登录窗直接销毁。
+func (g *GuiApp) hideActiveWindow() {
+	application.InvokeAsync(func() {
+		if g.inWebUI.Load() && g.webUIWin != nil {
+			hideWindow(g.webUIWin)
+		} else if g.loginWin != nil {
+			g.loginClosing.Store(true)
+			g.loginWin.Close()
+		}
+		if g.onTraySync != nil {
+			g.onTraySync()
+		}
+	})
 }
 
 // QuitApp 供前端"关闭确认对话框"选择退出时调用。
@@ -620,36 +780,6 @@ func (g *GuiApp) OpenConfigFile() (string, error) {
 		return "", fmt.Errorf("打开文件对话框失败: %w", err)
 	}
 	return result, nil
-}
-
-// ── 双窗口调度辅助 ───────────────────────────────────────────────────────────
-
-// showActiveWindow 从托盘/二次启动恢复窗口：
-// 若此前是在 WebUI 最小化收进托盘，则恢复原先的 WebUI 窗口；否则打开默认登录窗口。
-func (g *GuiApp) showActiveWindow() {
-	application.InvokeAsync(func() {
-		if g.inWebUI.Load() && g.webUIWin != nil {
-			showWindow(g.webUIWin)
-			return
-		}
-		g.inWebUI.Store(false)
-		g.createLoginWindow()
-	})
-}
-
-// hideActiveWindow 将当前活动窗口收进托盘：
-// WebUI 仅隐藏并暂停前端（保留原窗口状态）；登录窗直接销毁省内存。
-func (g *GuiApp) hideActiveWindow() {
-	application.InvokeAsync(func() {
-		if g.inWebUI.Load() && g.webUIWin != nil {
-			hideWindow(g.webUIWin)
-			return
-		}
-		if g.loginWin != nil {
-			g.loginClosing.Store(true)
-			g.loginWin.Close()
-		}
-	})
 }
 
 // ── 端口校验辅助 ─────────────────────────────────────────────────────────────
