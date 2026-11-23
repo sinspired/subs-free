@@ -19,16 +19,14 @@ import * as updater$0 from "../../updater/models.js";
 import * as $models from "./models.js";
 
 /**
- * BackToLogin 从 WebUI 返回登录窗口（供托盘菜单及切换配置使用）
+ * BackToLogin 从 WebUI 返回登录窗口（销毁管理面板并重新打开登录窗）
  */
 export function BackToLogin(): $CancellablePromise<void> {
     return $Call.ByID(2210097929);
 }
 
 /**
- * CheckForUpdates 触发更新检查，在自定义更新窗口中展示结果，
- * 并等待用户在窗口中点击"下载并安装"后才会真正下载、安装更新。
- * 供前端按钮和托盘菜单调用。
+ * CheckForUpdates 触发更新检查，在自定义更新窗口中展示结果。
  */
 export function CheckForUpdates(): $CancellablePromise<void> {
     return $Call.ByID(1256446317);
@@ -42,8 +40,7 @@ export function CompleteInit(): $CancellablePromise<void> {
 }
 
 /**
- * EnterWebUI 由前端调用：切换到本地 WebUI 大窗，隐藏登录小窗。
- * 每次调用都会用 g.configPath 刷新 URL，确保切换配置后 admin 显示正确的配置路径。
+ * EnterWebUI 由前端调用：按需创建本地 WebUI 大窗，同时销毁登录小窗释放内存。
  */
 export function EnterWebUI(): $CancellablePromise<void> {
     return $Call.ByID(551937120);
@@ -79,7 +76,6 @@ export function GetCheckState(): $CancellablePromise<$models.CheckState> {
 
 /**
  * GetConfigPath 返回当前生效配置文件的绝对路径。
- * 以函数引用形式传给 newCombinedAssetHandler，保证切换配置后注入值实时更新。
  */
 export function GetConfigPath(): $CancellablePromise<string> {
     return $Call.ByID(1772900587);
@@ -93,8 +89,7 @@ export function GetEnterNonce(remember: boolean): $CancellablePromise<string> {
 }
 
 /**
- * GetListenPort 返回 Gin HTTP 服务监听的端口号（不含冒号），
- * 供 newCombinedAssetHandler 构造反向代理目标地址使用。
+ * GetListenPort 返回 Gin HTTP 服务监听的端口号（不含冒号）。
  */
 export function GetListenPort(): $CancellablePromise<string> {
     return $Call.ByID(96953646);
@@ -112,7 +107,7 @@ export function GetUpdateStatus(): $CancellablePromise<updater$0.UpdateStatus> {
 }
 
 /**
- * HideToTray 供前端"关闭按钮对话框"选择最小化时调用。
+ * HideToTray 供前端"关闭按钮对话框"选择最小化时调用：直接销毁窗口，只留托盘。
  */
 export function HideToTray(): $CancellablePromise<void> {
     return $Call.ByID(171980759);
@@ -126,6 +121,13 @@ export function IsBackendReady(): $CancellablePromise<boolean> {
 }
 
 /**
+ * NotifyAutostartChanged 安全向登录窗同步开机自启状态变更事件。
+ */
+export function NotifyAutostartChanged(enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(943159520, enabled);
+}
+
+/**
  * OpenAboutWindow 打开或聚焦「关于」独立窗口（单例模式）。
  */
 export function OpenAboutWindow(): $CancellablePromise<void> {
@@ -134,9 +136,6 @@ export function OpenAboutWindow(): $CancellablePromise<void> {
 
 /**
  * OpenAnalysisWindow 打开或聚焦「分析报告」独立窗口（单例模式）。
- * 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
- * OpenAnalysisWindow 打开或聚焦「分析报告」独立窗口（单例模式）。
- * 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
  */
 export function OpenAnalysisWindow(): $CancellablePromise<void> {
     return $Call.ByID(2205529368);
@@ -151,7 +150,6 @@ export function OpenBrandURL(url: string, windowSize: string): $CancellablePromi
 
 /**
  * OpenConfigFile 打开系统文件选择对话框，返回用户选择的配置文件路径。
- * 用户取消时返回空字符串（不返回错误）。
  */
 export function OpenConfigFile(): $CancellablePromise<string> {
     return $Call.ByID(1547608438);
@@ -159,7 +157,6 @@ export function OpenConfigFile(): $CancellablePromise<string> {
 
 /**
  * OpenFilesWindow 打开或聚焦「内置文件」独立窗口（单例模式）。
- * 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
  */
 export function OpenFilesWindow(): $CancellablePromise<void> {
     return $Call.ByID(3767068697);
@@ -167,7 +164,6 @@ export function OpenFilesWindow(): $CancellablePromise<void> {
 
 /**
  * OpenInternalPage 在新窗口中打开内置 Web 页面（如 /files、/analysis）。
- * 通过 /gui/enter?n=<nonce>&redirect=<path> 中转，确保弹出窗口自动写入 API Key。
  */
 export function OpenInternalPage(path: string, title: string, windowSize: string): $CancellablePromise<void> {
     return $Call.ByID(1633695184, path, title, windowSize);
@@ -196,15 +192,13 @@ export function QuitApp(): $CancellablePromise<void> {
 
 /**
  * SetAutoStart 供前端 JS 绑定调用，切换开机自启。
- * 成功后同步更新托盘菜单 checkbox，保证两侧状态一致。
  */
 export function SetAutoStart(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(940964243, enabled);
 }
 
 /**
- * SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用，不重复更新托盘 checkbox）。
- * 修复：原实现忽略了 enable 参数，总是调用 Enable()。
+ * SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用）。
  */
 export function SetAutoStartEnabled(enable: boolean): $CancellablePromise<void> {
     return $Call.ByID(197427528, enable);
@@ -218,23 +212,14 @@ export function SetPorts(httpPort: string, subStorePort: string): $CancellablePr
 }
 
 /**
- * ShowWindow 供前端主动调用，显示并聚焦主窗口。
+ * ShowWindow 供前端主动调用，显示并聚焦登录窗口。
  */
 export function ShowWindow(): $CancellablePromise<void> {
     return $Call.ByID(91192051);
 }
 
 /**
- * SwitchConfigFile 切换到用户重新选择的配置文件：
- *  1. 直接读取目标配置文件中的 api-key 并与用户输入比对（不影响当前运行的内核）；
- *  2. 密钥匹配后，关闭（Shutdown）当前正在运行的内核实例；
- *  3. 等待旧内核占用的 HTTP 端口完全释放；
- *  4. 以新配置文件重新初始化并启动内核（Initialize 内部已包含 InitConfigLoad）；
- *  5. 返回切换后的 AppInfo，前端据此刷新界面状态并调用 EnterWebUI 进入管理界面。
- * 
- * 密钥不匹配或步骤 1 失败时，当前内核保持不变。
- * 步骤 2–4 失败时旧内核已不可恢复，g.backend 置 nil，g.pendingInit 置 true，
- * 错误原样返回给前端展示，用户可重试或重启程序。
+ * SwitchConfigFile 切换到用户重新选择的配置文件。
  */
 export function SwitchConfigFile(path: string, enteredKey: string): $CancellablePromise<$models.AppInfo> {
     return $Call.ByID(3083586062, path, enteredKey);
@@ -249,7 +234,6 @@ export function ValidateConfigKey(enteredKey: string, remember: boolean): $Cance
 
 /**
  * ValidatePort 实时验证单个端口号合法性（格式 + 是否被占用）。
- * 返回空字符串表示端口格式正确且当前未被占用。
  */
 export function ValidatePort(port: string): $CancellablePromise<string> {
     return $Call.ByID(2902552419, port);

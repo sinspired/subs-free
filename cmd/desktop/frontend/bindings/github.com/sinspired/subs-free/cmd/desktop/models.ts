@@ -91,30 +91,9 @@ export interface UpdateInfo {
     "releaseNotes": string;
     "downloadURL": string;
     "error": string;
-
-    /**
-     * 元信息展示字段
-     * 发布日期
-     */
     "publishDate": string;
-
-    /**
-     * 平台 (如 windows, darwin, linux)
-     */
     "platform": string;
-
-    /**
-     * 架构 (如 amd64, arm64)
-     */
     "arch": string;
-
-    /**
-     * 文件类型 (如 .exe, .dmg)
-     */
     "filetype": string;
-
-    /**
-     * 格式化后的文件大小 (如 12.5 MB)
-     */
     "assetSize": string;
 }

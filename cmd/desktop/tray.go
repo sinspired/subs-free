@@ -32,8 +32,6 @@ var trayIcon []byte
 var logo32 []byte
 
 // trayTemplateIcon 嵌入黑白模板图标，供 macOS 菜单栏使用。
-// 要求：纯黑色笔画 + 完全透明背景，18x18px（同时提供 @2x 36x36）。
-// macOS 会自动在深色模式下将黑色反转为白色。
 //
 //go:embed frontend/public/logo_template.png
 var trayTemplateIcon []byte
@@ -60,19 +58,12 @@ func startSysTray(
 ) {
 	tray := wailsApp.SystemTray.New()
 
-	// 设置图标：
-	// - SetIcon 供 Windows/Linux 使用（彩色 PNG）
-	// - SetTemplateIcon 供 macOS 菜单栏使用（黑白模板，自动适配深浅色）
-	// Wails v3 会根据平台自动选择使用哪个
 	tray.SetIcon(trayIcon)
-	tray.SetTemplateIcon(trayTemplateIcon) // ← 修复：传入变量，而非参数声明
+	tray.SetTemplateIcon(trayTemplateIcon)
 
-	// Support for template icons on macOS
 	if runtime.GOOS == "darwin" {
 		tray.SetTemplateIcon(trayTemplateIcon)
 	} else {
-		// Support for light/dark mode icons
-		// tray.SetDarkModeIcon(trayIconDark)
 		tray.SetIcon(trayIcon)
 	}
 
@@ -97,15 +88,12 @@ func startSysTray(
 				version = guiupdater.GetUpdateStatus().Version
 			}
 
-			// 1. 更新自定义状态并派发事件
 			nextSt := guiupdater.UpdateStatus{Available: true, Version: version}
 			guiupdater.SetUpdateStatus(nextSt)
 			wailsApp.Event.Emit(guiupdater.EventStatusChanged, nextSt)
 
-			// 2. 更新托盘菜单文本
 			if version != "" {
 				checkUpdateItem.SetLabel("有新版本 v" + version)
-				// 3. 发送系统通知提示用户
 				sendOSNotification("Subs Free 更新", "发现新版本 v"+version+"，请及时更新")
 			} else {
 				checkUpdateItem.SetLabel("有新版本")
@@ -118,7 +106,6 @@ func startSysTray(
 		application.InvokeAsync(func() {
 			checkUpdateItem.SetLabel("检查更新")
 
-			// 确保状态恢复
 			nextSt := guiupdater.UpdateStatus{Available: false, Version: ""}
 			guiupdater.SetUpdateStatus(nextSt)
 			wailsApp.Event.Emit(guiupdater.EventStatusChanged, nextSt)
@@ -143,6 +130,7 @@ func startSysTray(
 			}
 		})
 	})
+
 	tray.OnClick(func() {
 		if windowVisible.Load() {
 			guiApp.hideActiveWindow()
@@ -184,7 +172,7 @@ func buildTrayMenu(
 
 	menu.Add("隐藏主界面").OnClick(func(_ *application.Context) {
 		guiApp.hideActiveWindow()
-		sendOSNotification("Subs Free", "已最小化到系统托盘\n单击图标可恢复窗口")
+		sendOSNotification("Subs Free", "已最小化到系统托盘\n单击图标可重新打开")
 	})
 
 	menu.AddSeparator()
@@ -267,9 +255,7 @@ func buildTrayMenu(
 			err = guiApp.autostart.Disable()
 			sendOSNotification("Subs Free", "已取消开机自启")
 		}
-		if guiApp.loginWin != nil {
-			guiApp.loginWin.EmitEvent("autostart:changed", next)
-		}
+		guiApp.NotifyAutostartChanged(next)
 		if err != nil {
 			slog.Warn("设置开机自启失败", "error", err)
 			sendOSNotification("Subs Free", "设置开机自启失败："+err.Error())
@@ -295,7 +281,7 @@ func buildTrayMenu(
 		onQuit()
 	})
 
-	// 初始化 Notch Window (仅 macOS 生效，避免 Windows 额外创建一个常驻 WebView2 进程)
+	// 初始化 Notch Window (仅 macOS 灵动岛生效，避免 Windows 创建多余 WebView2 进程)
 	showNotch := func() {}
 	hideNotch := func() {}
 	if runtime.GOOS == "darwin" {
@@ -347,12 +333,9 @@ func buildTrayMenu(
 
 			// 状态：正在检测
 			if coreApp.IsChecking() {
-				// 1. 如果开始检测且 Notch 未显示，则滑动滑出
 				if !isNotchVisible.Load() {
-					isNotchVisible.Store(true) // 立即锁定状态，防止重复调用
-					application.InvokeAsync(func() {
-						showNotch()
-					})
+					isNotchVisible.Store(true)
+					showNotch()
 				}
 				stopCheckMenu.SetEnabled(true)
 				stopCheckAndExitMenu.SetEnabled(true)
@@ -362,23 +345,16 @@ func buildTrayMenu(
 				continue
 			}
 
-			// 2. 状态：检测空闲 (刚结束检测)
+			// 状态：检测空闲 (刚结束检测)
 			if isNotchVisible.Load() {
-				// 立即将可见性标记为 false，防止在接下来的 4 秒内重复触发计时器
 				isNotchVisible.Store(false)
-
-				// 延迟 4 秒收起，让用户看清最终的检测结果（如：可用 15 个）
 				time.AfterFunc(4*time.Second, func() {
-					// 4秒后，双重确认用户没有在这4秒内再次点击“开始检测”
 					if !coreApp.IsChecking() {
-						application.InvokeAsync(func() {
-							hideNotch()
-						})
+						hideNotch()
 					}
 				})
 			}
 
-			// 更新托盘文案
 			lastResult := coreApp.GetLastCheckResult()
 			if lastResult != "" {
 				statusItem.SetHidden(false)
@@ -463,18 +439,12 @@ func showWindow(win *application.WebviewWindow) {
 	win.Show()
 	win.Focus()
 	windowVisible.Store(true)
-	if win.Name() == "webui" {
-		win.EmitEvent("webui:visibility", true)
-	}
 	slog.Debug("窗口已显示")
 }
 
 func hideWindow(win *application.WebviewWindow) {
 	win.Hide()
 	windowVisible.Store(false)
-	if win.Name() == "webui" {
-		win.EmitEvent("webui:visibility", false)
-	}
 	slog.Debug("窗口已隐藏到托盘")
 }
 
@@ -494,7 +464,6 @@ func renderProgressString(coreApp *app.App) string {
 	}
 
 	var percent *float64
-	// 计算百分比
 	if state.ProxyCount > 0 {
 		val := float64(state.Progress) / float64(state.ProxyCount) * 100.0
 		if val < 0 {
@@ -508,12 +477,10 @@ func renderProgressString(coreApp *app.App) string {
 		percent = &val
 	}
 
-	// 特殊情况：代理或结果处理时不显示进度
 	if strings.Contains(stepName, "代理") || state.ProcessResults {
 		percent = nil
 	}
 
-	// 输出
 	if percent == nil {
 		return fmt.Sprintf("%s... %s", stepName, state.ETASuffix)
 	}

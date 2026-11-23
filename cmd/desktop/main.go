@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	guiupdater "github.com/sinspired/subs-free/updater"
@@ -59,19 +58,18 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		Windows: application.WindowsOptions{
+			// 关键配置：允许销毁全部窗口后继续保持托盘和 Go 后端在后台运行
 			DisableQuitOnLastWindowClosed: true,
-			UseVisualHosting:              true, // 修复 Windows WebView2 隐藏/跨DPI/RDP 渲染表面问题
+			UseVisualHosting:              true,
 		},
 
-		// 第二次启动时：唤醒第一实例
+		// 第二次启动时：唤醒第一实例（若窗口已销毁则重新拉起默认登录窗口）
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID:      "com.sinspired.subs_free",
 			EncryptionKey: singleInstanceKey,
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				slog.Debug("收到第二实例唤醒", "args", data.Args)
-				application.InvokeAsync(func() {
-					guiApp.showActiveWindow()
-				})
+				guiApp.showActiveWindow()
 			},
 		},
 	})
@@ -104,144 +102,10 @@ func main() {
 		}
 	}
 	guiApp.updaterApp = wailsApp
-
-	// 登录窗，加载 wails3 前端资产
-	loginWin := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:          "login",
-		Title:         "Subs Free",
-		Width:         560,
-		Height:        400,
-		MinWidth:      540,
-		MaxWidth:      600,
-		MinHeight:     380,
-		MaxHeight:     420,
-		DisableResize: false,
-		Frameless:     false,
-		AlwaysOnTop:   false,
-		URL:           "/",
-		KeyBindings: map[string]func(window application.Window){
-			"F1": func(window application.Window) {
-				guiApp.OpenAboutWindow()
-			},
-		},
-		Mac: macWindowOpts(30),
-		Windows: application.WindowsWindow{
-			DisableIcon:             false,
-			HiddenOnTaskbar:         false,
-			EnableSwipeGestures:     false,
-			GeneralAutofillEnabled:  true,
-			PasswordAutosaveEnabled: true,
-		},
-		BackgroundType: application.BackgroundTypeTranslucent,
-	})
-
-	// WebUI 大窗（加载 admin 页面，初始隐藏）
-	webUIWin := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:          "webui",
-		Title:         "Subs Free",
-		Width:         1100,
-		Height:        700,
-		MinWidth:      700,
-		MinHeight:     600,
-		Hidden:        true,
-		DisableResize: false,
-		Frameless:     false,
-		URL:           "about:blank",
-		KeyBindings: map[string]func(window application.Window){
-			"F1": func(window application.Window) {
-				guiApp.OpenAboutWindow()
-			},
-		},
-		Mac: macWindowOpts(40),
-		Windows: application.WindowsWindow{
-			DisableIcon:             false,
-			HiddenOnTaskbar:         false,
-			EnableSwipeGestures:     true,
-			GeneralAutofillEnabled:  true,
-			PasswordAutosaveEnabled: true,
-		},
-		BackgroundType: application.BackgroundTypeTranslucent,
-	})
-
-	// 注入窗口引用
-	guiApp.loginWin = loginWin
-	guiApp.webUIWin = webUIWin
 	guiApp.autostart = wailsApp.Autostart
 
-	// 窗口关闭/最小化拦截
-	loginWin.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		e.Cancel()
-		loginWin.EmitEvent("window:close-requested", nil)
-	})
-
-	// 用于在长期隐藏时释放 WebView2 内存（需配合 app.go 中的 webUIUnloaded 标记）
-	var (
-		webUIUnloadMu    sync.Mutex
-		webUIUnloadTimer *time.Timer
-	)
-	cancelWebUIUnload := func() {
-		webUIUnloadMu.Lock()
-		if webUIUnloadTimer != nil {
-			webUIUnloadTimer.Stop()
-			webUIUnloadTimer = nil
-		}
-		webUIUnloadMu.Unlock()
-	}
-	scheduleWebUIUnload := func() {
-		webUIUnloadMu.Lock()
-		if webUIUnloadTimer != nil {
-			webUIUnloadTimer.Stop()
-		}
-		// 隐藏超过 2 分钟仍未打开，重置为 about:blank 彻底释放 WebView2 内存
-		webUIUnloadTimer = time.AfterFunc(2*time.Minute, func() {
-			application.InvokeAsync(func() {
-				if !webUIWin.IsVisible() {
-					webUIWin.SetURL("about:blank")
-					webUIUnloaded.Store(true)
-					slog.Debug("管理界面长期隐藏，已重置为 about:blank 释放内存")
-				}
-			})
-		})
-		webUIUnloadMu.Unlock()
-	}
-
-	webUIWin.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		hideWindow(webUIWin)
-		e.Cancel()
-		sendOSNotification(
-			"Subs Free 后台运行",
-			"右键点击托盘图标，选择「立即退出」可关闭程序",
-		)
-	})
-
-	webUIWin.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-		hideWindow(webUIWin)
-		sendOSNotification("Subs Check PRO", "管理界面已最小化到系统托盘")
-	})
-
-	// 利用 Wails v3 原生可见性事件驱动前端启停轮询 + 闲置释放
-	webUIWin.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
-		webUIWin.EmitEvent("webui:visibility", false)
-		scheduleWebUIUnload()
-	})
-	webUIWin.OnWindowEvent(events.Common.WindowShow, func(e *application.WindowEvent) {
-		cancelWebUIUnload()
-		webUIWin.EmitEvent("webui:visibility", true)
-	})
-	webUIWin.OnWindowEvent(events.Common.WindowUnMinimise, func(e *application.WindowEvent) {
-		cancelWebUIUnload()
-		webUIWin.EmitEvent("webui:visibility", true)
-	})
-	webUIWin.OnWindowEvent(events.Common.WindowRestore, func(e *application.WindowEvent) {
-		cancelWebUIUnload()
-		webUIWin.EmitEvent("webui:visibility", true)
-	})
-
-	loginWin.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-		loginWin.Hide()
-		windowVisible.Store(false)
-		sendOSNotification("Subs Check PRO GUI", "登录窗口已最小化到系统托盘")
-	})
+	// 启动时仅创建登录小窗；webUIWin 改为进入管理界面时按需创建，关闭/最小化即销毁释放内存
+	guiApp.createLoginWindow()
 
 	// 退出生命周期清理
 	wailsApp.OnShutdown(func() {

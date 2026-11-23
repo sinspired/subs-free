@@ -4,49 +4,43 @@ package main
 import (
 	"context"
 	"fmt"
-	"runtime"
-
-	coreapp "github.com/sinspired/subs-check-pro/v3/app"
-	"github.com/sinspired/subs-check-pro/v3/config"
-	"github.com/sinspired/subs-check-pro/v3/utils"
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
-	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
-
 	"log/slog"
 	"net"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
+	coreapp "github.com/sinspired/subs-check-pro/v3/app"
+	"github.com/sinspired/subs-check-pro/v3/config"
+	"github.com/sinspired/subs-check-pro/v3/utils"
 	"github.com/sinspired/subs-free/updater"
-
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
+	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
 	"gopkg.in/yaml.v3"
 )
 
 // globalGuiApp 包级指针，供 router handler（如 handleGuiBackToLogin）访问。
 var globalGuiApp *GuiApp
 
-// 默认为 true，因为启动时 webUIWin 初始 URL 为 about:blank
-var webUIUnloaded atomic.Bool
-
-func init() {
-	webUIUnloaded.Store(true)
-}
-
 // GuiApp Wails 绑定结构体。
 type GuiApp struct {
 	configPath string
 	backend    *coreapp.App
 
-	// loginWin 登录小窗（加载 Wails 前端资产）。由 main.go 注入。
+	// loginWin 登录小窗（按需创建，关闭/最小化时销毁）。
 	loginWin *application.WebviewWindow
-	// webUIWin WebUI 大窗（加载 webui/admin.html，初始隐藏）。由 main.go 注入。
+	// webUIWin WebUI 大窗（进入管理界面时按需创建，关闭/最小化时销毁）。
 	webUIWin *application.WebviewWindow
+
+	// loginClosing 为 true 时表示代码主动销毁登录窗（进 WebUI / 最小化 / 最小化到托盘），不弹退出确认框。
+	loginClosing atomic.Bool
+	// webUISilentClose 为 true 时表示返回登录页 / 最小化 / 代码隐藏触发的销毁，不重复弹「后台运行」通知。
+	webUISilentClose atomic.Bool
 
 	// autostartMenuItem 托盘菜单中"开机自启"菜单项的引用。
 	autostartMenuItem *application.MenuItem
@@ -74,17 +68,8 @@ type GuiApp struct {
 	// updaterApp 持有 wails App 引用，供 CheckForUpdates 调用 Updater。
 	updaterApp *application.App
 
-	// checkingUpdate 防止用户连续快速点击"检查更新"图标：Check() 经代理
-	// 访问 GitHub，耗时可能到十几秒，这段时间里 updateWin 仍是 nil，若不
-	// 加这个防重入标志，每次点击都会另起一个 goroutine 重复调用 Check()，
-	// 多个 goroutine 前后脚判断出"窗口不存在"后各自尝试创建/订阅更新
-	// 窗口，导致窗口状态混乱、事件监听器重复订阅，表现为"点两次图标更新
-	// 窗口就出问题""下载完成偶发不显示更新日志"等间歇性故障。
+	// checkingUpdate 防止用户连续快速点击"检查更新"图标
 	checkingUpdate atomic.Bool
-
-	webUIUnloadMu    sync.Mutex
-	webUIUnloadTimer *time.Timer
-	webUIUnloadGen   uint64
 }
 
 // AppInfo 前端展示所需的应用运行信息。
@@ -118,10 +103,7 @@ type AppInfo struct {
 	LocalIPs []string `json:"localIPs"`
 }
 
-// getLocalIPv4s 枚举本机所有活动网络接口上的 IPv4 地址（排除回环、
-// 未启用、虚拟/回环类接口），用于生成局域网可访问的订阅链接。
-// 多网卡（有线+无线、虚拟网卡等）情况下可能返回多个地址，
-// 交由前端以胶囊按钮形式展示供用户选择。
+// getLocalIPv4s 枚举本机所有活动网络接口上的 IPv4 地址（排除回环、未启用接口）。
 func getLocalIPv4s() []string {
 	var ips []string
 	ifaces, err := net.Interfaces()
@@ -129,7 +111,6 @@ func getLocalIPv4s() []string {
 		return ips
 	}
 	for _, iface := range ifaces {
-		// 跳过未启用或回环接口
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
@@ -150,7 +131,7 @@ func getLocalIPv4s() []string {
 			}
 			ip4 := ip.To4()
 			if ip4 == nil {
-				continue // 仅取 IPv4，跳过 IPv6
+				continue
 			}
 			ips = append(ips, ip4.String())
 		}
@@ -158,12 +139,114 @@ func getLocalIPv4s() []string {
 	return ips
 }
 
+// createLoginWindow 在主线程创建或聚焦登录小窗（启动时同步调用，运行时通过 openLoginWindow 调度）。
+func (g *GuiApp) createLoginWindow() {
+	wailsApp := application.Get()
+	if wailsApp == nil {
+		wailsApp = g.updaterApp
+	}
+	if wailsApp == nil {
+		return
+	}
+
+	if g.loginWin != nil {
+		g.loginWin.Show()
+		g.loginWin.Focus()
+		windowVisible.Store(true)
+		return
+	}
+
+	win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:          "login",
+		Title:         "Subs Free",
+		Width:         560,
+		Height:        400,
+		MinWidth:      540,
+		MaxWidth:      600,
+		MinHeight:     380,
+		MaxHeight:     420,
+		DisableResize: false,
+		Frameless:     false,
+		AlwaysOnTop:   false,
+		URL:           "/",
+		KeyBindings: map[string]func(window application.Window){
+			"F1": func(window application.Window) {
+				g.OpenAboutWindow()
+			},
+		},
+		Mac: macWindowOpts(30),
+		Windows: application.WindowsWindow{
+			DisableIcon:             false,
+			HiddenOnTaskbar:         false,
+			EnableSwipeGestures:     false,
+			GeneralAutofillEnabled:  true,
+			PasswordAutosaveEnabled: true,
+		},
+		BackgroundType: application.BackgroundTypeTranslucent,
+	})
+
+	g.loginWin = win
+	windowVisible.Store(true)
+
+	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		if g.loginClosing.CompareAndSwap(true, false) {
+			g.loginWin = nil
+			if g.webUIWin == nil {
+				windowVisible.Store(false)
+			}
+			return
+		}
+		e.Cancel()
+		win.EmitEvent("window:close-requested", nil)
+	})
+
+	// 最小化时直接销毁登录小窗释放 WebView2 内存，点托盘图标可重新打开
+	win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
+		g.closeLoginWindow()
+		sendOSNotification("Subs Check PRO GUI", "已最小化到系统托盘，点击托盘图标可重新打开")
+	})
+}
+
+// openLoginWindow 从任意线程安全唤起默认登录窗口。
+func (g *GuiApp) openLoginWindow() {
+	application.InvokeAsync(g.createLoginWindow)
+}
+
+// closeLoginWindow 直接销毁登录小窗进程（不弹退出确认框）。
+func (g *GuiApp) closeLoginWindow() {
+	application.InvokeAsync(func() {
+		if g.loginWin == nil {
+			return
+		}
+		g.loginClosing.Store(true)
+		g.loginWin.Close()
+	})
+}
+
+// closeWebUIWindow 直接销毁管理面板进程。
+func (g *GuiApp) closeWebUIWindow() {
+	application.InvokeAsync(func() {
+		if g.webUIWin == nil {
+			return
+		}
+		g.webUIWin.Close()
+	})
+}
+
+// NotifyAutostartChanged 安全向登录窗同步开机自启状态变更事件。
+func (g *GuiApp) NotifyAutostartChanged(enabled bool) {
+	application.InvokeAsync(func() {
+		if g.loginWin != nil {
+			g.loginWin.EmitEvent("autostart:changed", enabled)
+		}
+	})
+}
+
 // OpenBrandURL 在 Wails 无地址栏窗口中打开品牌 / 社交链接。
 func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 	if url == "" {
 		return
 	}
-	// 安全校验：只允许 http/https 协议
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		return
 	}
@@ -174,15 +257,12 @@ func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 
 	capturedURL := url
 	application.InvokeAsync(func() {
-		// 先加载本地 loading 页（即时显示，无白屏）。
-		// Hash 仅供 loading.html 显示目标域名提示，实际跳转由 Go 端 SetURL 完成。
 		opts := newPopupOptions("Subs Free", "/loading.html#"+capturedURL, windowSize)
 		popup := wailsApp.Window.NewWithOptions(opts)
 		popup.Show()
 		popup.Center()
 		popup.Focus()
 
-		// 300 ms 对于本地静态页足够，且不会出现 JS 导航被 WebView 拦截的问题。
 		time.AfterFunc(300*time.Millisecond, func() {
 			application.InvokeAsync(func() {
 				popup.SetURL(capturedURL)
@@ -191,25 +271,90 @@ func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 	})
 }
 
-// EnterWebUI 由前端调用：切换到本地 WebUI 大窗，隐藏登录小窗。
-// 每次调用都会用 g.configPath 刷新 URL，确保切换配置后 admin 显示正确的配置路径。
+// EnterWebUI 由前端调用：按需创建本地 WebUI 大窗，同时销毁登录小窗释放内存。
 func (g *GuiApp) EnterWebUI() {
-	if g.webUIWin == nil || g.loginWin == nil {
+	wailsApp := application.Get()
+	if wailsApp == nil {
 		return
 	}
-	g.cancelWebUIUnload()
-	g.inWebUI.Store(true)
-	webUIUnloaded.Store(false)
 
-	// 将当前 configPath 作为查询参数传入，保证切换配置后 admin 页面
-	// 读取到的是新配置文件的路径，而非启动时的旧路径。
 	adminURL := "/webui/admin.html?configPath=" + url.QueryEscape(g.configPath)
-	g.webUIWin.SetURL(adminURL)
-	g.webUIWin.Show()
-	g.webUIWin.Center()
-	g.webUIWin.Focus()
-	g.loginWin.Hide()
-	windowVisible.Store(true)
+
+	application.InvokeAsync(func() {
+		g.inWebUI.Store(true)
+
+		if g.webUIWin != nil {
+			g.webUIWin.SetURL(adminURL)
+			g.webUIWin.Show()
+			g.webUIWin.Center()
+			g.webUIWin.Focus()
+			windowVisible.Store(true)
+		} else {
+			win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+				Name:          "webui",
+				Title:         "Subs Free",
+				Width:         1100,
+				Height:        700,
+				MinWidth:      700,
+				MinHeight:     600,
+				DisableResize: false,
+				Frameless:     false,
+				URL:           adminURL,
+				KeyBindings: map[string]func(window application.Window){
+					"F1": func(window application.Window) {
+						g.OpenAboutWindow()
+					},
+				},
+				Mac: macWindowOpts(40),
+				Windows: application.WindowsWindow{
+					DisableIcon:             false,
+					HiddenOnTaskbar:         false,
+					EnableSwipeGestures:     true,
+					GeneralAutofillEnabled:  true,
+					PasswordAutosaveEnabled: true,
+				},
+				BackgroundType: application.BackgroundTypeTranslucent,
+			})
+
+			g.webUIWin = win
+			windowVisible.Store(true)
+
+			// 关闭按钮：直接销毁 WebView2 进程，复位为下次点击托盘打开默认登录窗口
+			win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+				g.webUIWin = nil
+				g.inWebUI.Store(false)
+				if g.loginWin == nil {
+					windowVisible.Store(false)
+				}
+				if !g.webUISilentClose.CompareAndSwap(true, false) {
+					sendOSNotification(
+						"Subs Free 后台运行",
+						"已释放管理面板进程，点击托盘图标可重新打开",
+					)
+				}
+			})
+
+			// 最小化按钮：直接销毁 WebView2 进程释放内存，点击托盘重新打开默认登录窗口
+			win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
+				g.webUISilentClose.Store(true)
+				g.closeWebUIWindow()
+				sendOSNotification(
+					"Subs Check PRO",
+					"管理界面已最小化到系统托盘，点击托盘图标可重新打开",
+				)
+			})
+
+			win.Show()
+			win.Center()
+			win.Focus()
+		}
+
+		// 进入管理面板后立即销毁登录窗，减少一个 WebView2 进程
+		if g.loginWin != nil {
+			g.loginClosing.Store(true)
+			g.loginWin.Close()
+		}
+	})
 }
 
 // GetAPIKey 返回当前配置的 API Key，供本地 WebUI 页面通过 Wails binding 调用。
@@ -218,7 +363,6 @@ func (g *GuiApp) GetAPIKey() string {
 }
 
 // defaultListenPort 返回当前配置的 HTTP 监听端口号（不含冒号前缀）。
-// GlobalConfig 未初始化或端口为空时，回退到内置默认值 "8199"。
 func defaultListenPort() string {
 	port := strings.TrimPrefix(config.GlobalConfig.ListenPort, ":")
 	if port == "" {
@@ -227,72 +371,26 @@ func defaultListenPort() string {
 	return port
 }
 
-// GetListenPort 返回 Gin HTTP 服务监听的端口号（不含冒号），
-// 供 newCombinedAssetHandler 构造反向代理目标地址使用。
+// GetListenPort 返回 Gin HTTP 服务监听的端口号（不含冒号）。
 func (g *GuiApp) GetListenPort() string {
 	return defaultListenPort()
 }
 
 // GetConfigPath 返回当前生效配置文件的绝对路径。
-// 以函数引用形式传给 newCombinedAssetHandler，保证切换配置后注入值实时更新。
 func (g *GuiApp) GetConfigPath() string {
 	return g.configPath
 }
 
-// BackToLogin 从 WebUI 返回登录窗口（供托盘菜单及切换配置使用）
+// BackToLogin 从 WebUI 返回登录窗口（销毁管理面板并重新打开登录窗）
 func (g *GuiApp) BackToLogin() {
-	if g.loginWin == nil {
-		return
-	}
-	g.cancelWebUIUnload()
 	g.inWebUI.Store(false)
-
-	// 先隐藏并卸载 WebUI 页面，释放全部 WebView2/JS 内存，避免影响 windowVisible
-	if g.webUIWin != nil {
-		g.webUIWin.Hide()
-		g.webUIWin.EmitEvent("webui:visibility", false)
-		g.webUIWin.SetURL("about:blank")
-		webUIUnloaded.Store(true)
-	}
-
-	showWindow(g.loginWin)
-	g.loginWin.Center()
-}
-
-// cancelWebUIUnload 取消待执行的闲置卸载任务。
-func (g *GuiApp) cancelWebUIUnload() {
-	g.webUIUnloadMu.Lock()
-	g.webUIUnloadGen++
-	if g.webUIUnloadTimer != nil {
-		g.webUIUnloadTimer.Stop()
-		g.webUIUnloadTimer = nil
-	}
-	g.webUIUnloadMu.Unlock()
-}
-
-// scheduleWebUIUnload 在窗口隐藏一段时间后重置为 about:blank，彻底回收 WebView2 内存。
-// （注：若用户有未保存的表单修改且希望保留更久，可将 5*time.Minute 调大）
-func (g *GuiApp) scheduleWebUIUnload() {
-	g.webUIUnloadMu.Lock()
-	g.webUIUnloadGen++
-	gen := g.webUIUnloadGen
-	if g.webUIUnloadTimer != nil {
-		g.webUIUnloadTimer.Stop()
-	}
-	g.webUIUnloadTimer = time.AfterFunc(5*time.Minute, func() {
-		application.InvokeAsync(func() {
-			g.webUIUnloadMu.Lock()
-			stale := g.webUIUnloadGen != gen
-			g.webUIUnloadMu.Unlock()
-			if stale || g.webUIWin == nil || g.webUIWin.IsVisible() || webUIUnloaded.Load() {
-				return
-			}
-			g.webUIWin.SetURL("about:blank")
-			webUIUnloaded.Store(true)
-			slog.Debug("管理界面长期隐藏，已重置为 about:blank 释放 WebView2 内存")
-		})
+	g.openLoginWindow()
+	application.InvokeAsync(func() {
+		if g.webUIWin != nil {
+			g.webUISilentClose.Store(true)
+			g.webUIWin.Close()
+		}
 	})
-	g.webUIUnloadMu.Unlock()
 }
 
 // GetAppInfo 返回应用运行信息（含端口冲突检测）。
@@ -300,7 +398,6 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 	port := defaultListenPort()
 	subStorePort := strings.TrimPrefix(config.GlobalConfig.SubStorePort, ":")
 
-	// 冲突状态仅在 pendingInit 阶段有意义，动态查询当前占用情况。
 	var conflictHTTP, conflictSubStore bool
 	if g.pendingInit && g.backend != nil {
 		httpAvail, subAvail := g.backend.CheckPortConflict()
@@ -355,7 +452,6 @@ func (g *GuiApp) CompleteInit() error {
 		return fmt.Errorf("初始化后端失败: %w", err)
 	}
 
-	// 注意：只调用一次 registerGuiRoutes，不重复调用（重复注册同一路径会 panic）。
 	registerGuiRoutes(g.backend.GetRouter())
 
 	utils.OSNotifyHook = func(title, body string) {
@@ -388,8 +484,7 @@ func (g *GuiApp) ValidateConfigKey(enteredKey string, remember bool) (string, er
 	return generateNonce(actual, remember), nil
 }
 
-// peekConfigAPIKey 在不影响当前运行配置的前提下，直接读取并解析指定配置文件，
-// 返回其中的 api-key。仅用于"切换配置文件"流程中的密钥预校验。
+// peekConfigAPIKey 在不影响当前运行配置的前提下，直接读取并解析指定配置文件中的 api-key。
 func peekConfigAPIKey(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -407,23 +502,13 @@ func peekConfigAPIKey(path string) (string, error) {
 	return target.APIKey, nil
 }
 
-// SwitchConfigFile 切换到用户重新选择的配置文件：
-//  1. 直接读取目标配置文件中的 api-key 并与用户输入比对（不影响当前运行的内核）；
-//  2. 密钥匹配后，关闭（Shutdown）当前正在运行的内核实例；
-//  3. 等待旧内核占用的 HTTP 端口完全释放；
-//  4. 以新配置文件重新初始化并启动内核（Initialize 内部已包含 InitConfigLoad）；
-//  5. 返回切换后的 AppInfo，前端据此刷新界面状态并调用 EnterWebUI 进入管理界面。
-//
-// 密钥不匹配或步骤 1 失败时，当前内核保持不变。
-// 步骤 2–4 失败时旧内核已不可恢复，g.backend 置 nil，g.pendingInit 置 true，
-// 错误原样返回给前端展示，用户可重试或重启程序。
+// SwitchConfigFile 切换到用户重新选择的配置文件。
 func (g *GuiApp) SwitchConfigFile(path, enteredKey string) (AppInfo, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return AppInfo{}, fmt.Errorf("配置文件路径为空")
 	}
 
-	// 步骤 1：仅读取目标配置的 api-key，不触碰当前运行中的内核。
 	actual, err := peekConfigAPIKey(path)
 	if err != nil {
 		return AppInfo{}, err
@@ -432,35 +517,25 @@ func (g *GuiApp) SwitchConfigFile(path, enteredKey string) (AppInfo, error) {
 		return AppInfo{}, fmt.Errorf("密钥错误")
 	}
 
-	// 步骤 2：记录旧 HTTP 端口（Shutdown 后 GlobalConfig 会被覆盖，提前保存）。
 	oldHTTPPort := normalizePort(config.GlobalConfig.ListenPort)
 
-	// 步骤 3：关闭旧内核，释放端口和所有后台任务。
 	if g.backend != nil {
 		if err := g.backend.Shutdown(); err != nil {
-			// Shutdown 失败通常是轻微错误（如 watcher 已关闭），继续切换。
 			slog.Warn("SwitchConfigFile：关闭旧内核时发生非致命错误", "error", err)
 		}
-		// 清除引用，防止 OnShutdown 对已关闭的内核执行二次 Shutdown。
 		g.backend = nil
 	}
 
-	// 步骤 4：等待旧 HTTP 端口完全释放，避免新内核绑定时 "address already in use"。
 	if oldHTTPPort != "" {
 		waitForPortRelease(oldHTTPPort, 3*time.Second)
 	}
 
-	// 步骤 5：创建并初始化新内核。
-	// Initialize() 内部已包含 InitConfigLoad()，无需重复调用。
 	newBackend := coreapp.New(Version, Version+CurrentCommit, path)
 	if err := newBackend.Initialize(); err != nil {
-		// 新内核初始化失败：应用处于无后端状态，通知前端显示错误。
 		g.pendingInit = true
 		return AppInfo{}, fmt.Errorf("初始化新配置失败: %w", err)
 	}
 
-	// 新内核拥有全新路由器，重新注册 GUI 专属路由
-	// （旧路由器随旧内核一起丢弃，不会触发 panic）。
 	registerGuiRoutes(newBackend.GetRouter())
 
 	utils.OSNotifyHook = func(title, body string) {
@@ -478,8 +553,7 @@ func (g *GuiApp) SwitchConfigFile(path, enteredKey string) (AppInfo, error) {
 	return g.GetAppInfo(), nil
 }
 
-// waitForPortRelease 轮询直到指定端口可用（或超时），用于在旧后端 Shutdown 后、
-// 新后端 Initialize 前确保 TCP 端口已被 OS 完全释放，避免 "address already in use"。
+// waitForPortRelease 轮询直到指定端口可用（或超时）。
 func waitForPortRelease(port string, timeout time.Duration) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -492,7 +566,6 @@ func waitForPortRelease(port string, timeout time.Duration) {
 }
 
 // ValidatePort 实时验证单个端口号合法性（格式 + 是否被占用）。
-// 返回空字符串表示端口格式正确且当前未被占用。
 func (g *GuiApp) ValidatePort(port string) string {
 	p := normalizePort(port)
 	if err := validatePort(p); err != nil {
@@ -509,22 +582,24 @@ func (g *GuiApp) SetPorts(httpPort, subStorePort string) error {
 	return g.backend.SetPorts(httpPort, subStorePort)
 }
 
-// ShowWindow 供前端主动调用，显示并聚焦主窗口。
+// ShowWindow 供前端主动调用，显示并聚焦登录窗口。
 func (g *GuiApp) ShowWindow() {
-	if g.loginWin == nil {
-		return
-	}
-	g.loginWin.Show()
-	g.loginWin.Focus()
-	windowVisible.Store(true)
+	g.openLoginWindow()
 }
 
-// HideToTray 供前端"关闭按钮对话框"选择最小化时调用。
+// HideToTray 供前端"关闭按钮对话框"选择最小化时调用：直接销毁窗口，只留托盘。
 func (g *GuiApp) HideToTray() {
-	if g.loginWin == nil {
-		return
-	}
-	hideWindow(g.loginWin)
+	g.inWebUI.Store(false)
+	application.InvokeAsync(func() {
+		if g.webUIWin != nil {
+			g.webUISilentClose.Store(true)
+			g.webUIWin.Close()
+		}
+		if g.loginWin != nil {
+			g.loginClosing.Store(true)
+			g.loginWin.Close()
+		}
+	})
 	sendOSNotification("Subs Check PRO", "GUI已最小化到系统托盘")
 }
 
@@ -538,7 +613,6 @@ func (g *GuiApp) QuitApp() {
 }
 
 // OpenConfigFile 打开系统文件选择对话框，返回用户选择的配置文件路径。
-// 用户取消时返回空字符串（不返回错误）。
 func (g *GuiApp) OpenConfigFile() (string, error) {
 	app := application.Get()
 	if app == nil {
@@ -565,36 +639,32 @@ func (g *GuiApp) OpenConfigFile() (string, error) {
 
 // ── 双窗口调度辅助 ───────────────────────────────────────────────────────────
 
-// showActiveWindow 根据当前所处模式（WebUI / 登录窗口）显示对应窗口。
+// showActiveWindow 点击托盘或二次启动时唤起窗口：管理面板已销毁则打开默认登录窗口。
 func (g *GuiApp) showActiveWindow() {
-	if g.inWebUI.Load() {
-		if g.webUIWin != nil {
-			// 若此前因长期隐藏被卸载到 about:blank，直接重新进入管理页
-			if webUIUnloaded.Load() {
-				g.EnterWebUI()
-				return
-			}
-			g.cancelWebUIUnload()
-			showWindow(g.webUIWin)
+	application.InvokeAsync(func() {
+		if g.inWebUI.Load() && g.webUIWin != nil {
+			g.webUIWin.Show()
+			g.webUIWin.Focus()
+			windowVisible.Store(true)
+			return
 		}
-	} else {
-		if g.loginWin != nil {
-			showWindow(g.loginWin)
-		}
-	}
+		g.createLoginWindow()
+	})
 }
 
-// hideActiveWindow 根据当前所处模式（WebUI / 登录窗口）隐藏对应窗口。
+// hideActiveWindow 隐藏/释放当前活动窗口到托盘。
 func (g *GuiApp) hideActiveWindow() {
-	if g.inWebUI.Load() {
+	g.inWebUI.Store(false)
+	application.InvokeAsync(func() {
 		if g.webUIWin != nil {
-			hideWindow(g.webUIWin)
+			g.webUISilentClose.Store(true)
+			g.webUIWin.Close()
 		}
-	} else {
 		if g.loginWin != nil {
-			hideWindow(g.loginWin)
+			g.loginClosing.Store(true)
+			g.loginWin.Close()
 		}
-	}
+	})
 }
 
 // ── 端口校验辅助 ─────────────────────────────────────────────────────────────
@@ -646,8 +716,7 @@ func (g *GuiApp) GetAutoStartEnabled() (bool, error) {
 	return g.autostart.IsEnabled()
 }
 
-// SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用，不重复更新托盘 checkbox）。
-// 修复：原实现忽略了 enable 参数，总是调用 Enable()。
+// SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用）。
 func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
 	if enable {
 		return g.autostart.Enable()
@@ -656,7 +725,6 @@ func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
 }
 
 // SetAutoStart 供前端 JS 绑定调用，切换开机自启。
-// 成功后同步更新托盘菜单 checkbox，保证两侧状态一致。
 func (g *GuiApp) SetAutoStart(enabled bool) error {
 	if g.autostartMenuItem != nil {
 		g.autostartMenuItem.SetChecked(enabled)
@@ -668,7 +736,6 @@ func (g *GuiApp) SetAutoStart(enabled bool) error {
 }
 
 // OpenInternalPage 在新窗口中打开内置 Web 页面（如 /files、/analysis）。
-// 通过 /gui/enter?n=<nonce>&redirect=<path> 中转，确保弹出窗口自动写入 API Key。
 func (g *GuiApp) OpenInternalPage(path string, title string, windowSize string) {
 	listenPort := defaultListenPort()
 
@@ -678,9 +745,6 @@ func (g *GuiApp) OpenInternalPage(path string, title string, windowSize string) 
 	}
 
 	nonce := generateNonce(config.GlobalConfig.APIKey, false)
-
-	// 使用 url.QueryEscape 对 path 进行编码
-	// 防止 path 中本身带有 ?theme=dark 等参数时，破坏完整的 GET 参数结构
 	targetURL := baseURL + "/gui/enter?n=" + nonce + "&redirect=" + url.QueryEscape(path)
 
 	wailsApp := application.Get()
@@ -733,19 +797,14 @@ func (g *GuiApp) OpenAboutWindow() {
 	})
 }
 
-// CheckForUpdates 触发更新检查，在自定义更新窗口中展示结果，
-// 并等待用户在窗口中点击"下载并安装"后才会真正下载、安装更新。
-// 供前端按钮和托盘菜单调用。
+// CheckForUpdates 触发更新检查，在自定义更新窗口中展示结果。
 func (g *GuiApp) CheckForUpdates() {
 	if g.updaterApp == nil {
 		sendOSNotification("Subs Free", "更新检查暂不可用")
-		// 同时通知前端 toast，避免用户点击后毫无反馈
 		application.Get().Event.Emit("gui:update:toast", "更新检查暂不可用")
 		return
 	}
 
-	// 若更新窗口已存在（后台下载中），直接前置显示，不重新触发检查。
-	// 放在加锁之前、goroutine 之外同步判断，响应更快。
 	if g.updateWin != nil {
 		application.InvokeAsync(func() {
 			g.updateWin.Show()
@@ -754,10 +813,6 @@ func (g *GuiApp) CheckForUpdates() {
 		return
 	}
 
-	// 防重入：Check() 经代理访问 GitHub 耗时不定（最长 updater.CheckTimeout），
-	// 这段时间内 updateWin 仍是 nil，用户容易因为"点了没反应"而多点几次。
-	// CompareAndSwap 保证同一时刻只有一次 Check() 在跑，重复点击只提示
-	// "正在检查中"，不会再并发跑出多个 goroutine 抢着创建/订阅更新窗口。
 	if !g.checkingUpdate.CompareAndSwap(false, true) {
 		g.updaterApp.Event.Emit("gui:update:toast", "正在检查更新，请稍候…")
 		return
@@ -766,8 +821,6 @@ func (g *GuiApp) CheckForUpdates() {
 	go func() {
 		defer g.checkingUpdate.Store(false)
 
-		// 用 updater.CheckTimeout 接上整体上限，之前此处用的是裸 context.Background()，
-		// 没有任何超时上限，一旦代理彻底失联，这个 goroutine 会永久挂起。
 		ctx, cancel := context.WithTimeout(context.Background(), updater.CheckTimeout)
 		defer cancel()
 
@@ -775,34 +828,22 @@ func (g *GuiApp) CheckForUpdates() {
 		if err != nil {
 			slog.Warn("检查更新失败", "error", err)
 			sendOSNotification("Subs Check PRO GUI 更新失败", err.Error())
-			// emit 给前端 toast 展示
 			g.updaterApp.Event.Emit("gui:update:toast", "检查更新失败: "+err.Error())
 			return
 		}
 
 		if updateInfo == nil {
-			// 已经是最新版
 			slog.Debug("当前已是最新版")
-
-			// emit 给前端 toast 展示
 			g.updaterApp.Event.Emit("gui:update:toast", "已经是最新版")
-
-			// 发送系统通知
 			sendOSNotification("Subs Free", "已经是最新版")
 			return
 		}
 
-		// 发现新版本：打开更新窗口...
 		g.showUpdateWindow(updateInfo)
 	}()
 }
 
-// showUpdateWindow 打开（或复用）自定义更新窗口，回放当前更新状态，
-// 并订阅窗口的用户操作事件（user:install / user:restart / user:skip /
-// user:remind / user:cancel），驱动后续 DownloadAndInstall / Restart /
-// SkipVersion 流程。
-//
-// 必须在主线程（InvokeAsync）中创建/操作窗口。
+// showUpdateWindow 打开（或复用）自定义更新窗口。
 func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -811,7 +852,6 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 
 	application.InvokeAsync(func() {
 		if g.updateWin != nil {
-			// 窗口已存在：仅回放最新状态并前置显示。
 			g.emitUpdateSnapshot(rel)
 			g.updateWin.Show()
 			g.updateWin.Focus()
@@ -819,38 +859,28 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 		}
 
 		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-			Name:          "updater",
-			Title:         "Subs Free — 检查更新",
-			Width:         520,
-			Height:        540,
-			MinWidth:      348,
-			MinHeight:     161,
-			DisableResize: false,
-			Frameless:     false,
-			// 复用前端构建产物（Preact + marked/DOMPurify 渲染 Markdown），
-			// 与登录/关于窗口共享同一套样式与依赖，不再使用 go:embed 内嵌 HTML。
+			Name:           "updater",
+			Title:          "Subs Free — 检查更新",
+			Width:          520,
+			Height:         540,
+			MinWidth:       348,
+			MinHeight:      161,
+			DisableResize:  false,
+			Frameless:      false,
 			URL:            "/updater.html",
 			Mac:            macWindowOpts(40),
 			BackgroundType: application.BackgroundTypeTranslucent,
 		})
 		g.updateWin = win
 
-		// --- 订阅窗口发出的用户操作事件 ---
-		// 注意：这个 ctx 不能在此处直接包 context.WithTimeout(updater.MaxDownloadDuration)，
-		// 因为它同时被 restart/skip 等事件复用，下载超时不应影响重启。
-		// 下载本身的整体超时在 EventUserInstall 的 handler 里单独构造。
 		ctx := context.Background()
 
 		g.subscribeUpdateEvent(wupdater.EventWindowReady, func(_ *application.CustomEvent) {
-			// 自定义窗口加载完成后会主动请求一次状态回放。
 			g.emitUpdateSnapshot(rel)
 		})
 
 		g.subscribeUpdateEvent(wupdater.EventUserInstall, func(_ *application.CustomEvent) {
 			go func() {
-				// 用 updater.MaxDownloadDuration 给整个下载+安装流程一个硬性上限，避免
-				// 极端情况下 goroutine 无限挂起；具体的限速及早失败逻辑由
-				// updater.NewHTTPClient 内部的 speedGuardTransport 负责，这里只是其上限保障。
 				dlCtx, dlCancel := context.WithTimeout(ctx, updater.MaxDownloadDuration)
 				defer dlCancel()
 				err := g.updaterApp.Updater.DownloadAndInstall(dlCtx)
@@ -864,7 +894,6 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 					}
 					return
 				}
-				// alpha.98 不会在 DownloadAndInstall 成功后 emit EventUpdateReady，手动补发。
 				if g.updaterApp != nil {
 					g.updaterApp.Event.Emit(wupdater.EventUpdateReady, nil)
 				}
@@ -885,7 +914,6 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 			g.closeUpdateWindow()
 		})
 
-		// user:background — 仅隐藏窗口，保留下载进度和事件监听
 		g.subscribeUpdateEvent("wails:updater:user:background", func(_ *application.CustomEvent) {
 			application.InvokeAsync(func() {
 				if g.updateWin != nil {
@@ -894,7 +922,6 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 			})
 		})
 
-		// user:remind 只隐藏（非下载阶段的"稍后提醒"，逻辑相同）
 		g.subscribeUpdateEvent(wupdater.EventUserRemind, func(_ *application.CustomEvent) {
 			application.InvokeAsync(func() {
 				if g.updateWin != nil {
@@ -903,7 +930,6 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 			})
 		})
 
-		// user:cancel：真正关闭
 		g.subscribeUpdateEvent(wupdater.EventUserCancel, func(_ *application.CustomEvent) {
 			g.closeUpdateWindow()
 		})
@@ -912,15 +938,11 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 			g.teardownUpdateWindow()
 		})
 
-		// 首次打开时直接回放一次（部分 webview 在极快加载时可能错过
-		// window:ready 的首发事件）。
 		g.emitUpdateSnapshot(rel)
 		win.Show()
 	})
 }
 
-// subscribeUpdateEvent 注册一个全局 wails 事件监听，并将其取消函数记录到
-// g.updateWinUnsubs，随更新窗口关闭统一清理，避免重复打开窗口时监听器泄漏。
 func (g *GuiApp) subscribeUpdateEvent(name string, fn func(*application.CustomEvent)) {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -930,9 +952,6 @@ func (g *GuiApp) subscribeUpdateEvent(name string, fn func(*application.CustomEv
 	g.updateWinUnsubs = append(g.updateWinUnsubs, off)
 }
 
-// emitUpdateSnapshot 向更新窗口回放"发现新版本"状态：先发送 EventMeta
-// （携带当前版本号），再发送 EventUpdateAvailable（携带新版本信息和发布说明）。
-// 自定义更新窗口（updater_window.html）据此渲染版本号、发布说明和操作按钮。
 func (g *GuiApp) emitUpdateSnapshot(rel *wupdater.Release) {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -945,16 +964,12 @@ func (g *GuiApp) emitUpdateSnapshot(rel *wupdater.Release) {
 	wailsApp.Event.Emit(wupdater.EventUpdateAvailable, rel)
 }
 
-// closeUpdateWindow 关闭自定义更新窗口；实际的监听器清理由
-// WindowClosing 钩子中的 teardownUpdateWindow 完成。
 func (g *GuiApp) closeUpdateWindow() {
 	if g.updateWin != nil {
 		g.updateWin.Close()
 	}
 }
 
-// teardownUpdateWindow 取消所有为本次更新窗口注册的事件监听，并清空引用，
-// 以便下次 CheckForUpdates 重新打开一个干净的窗口。
 func (g *GuiApp) teardownUpdateWindow() {
 	for _, off := range g.updateWinUnsubs {
 		if off != nil {
@@ -974,12 +989,11 @@ type UpdateInfo struct {
 	DownloadURL    string `json:"downloadURL"`
 	Error          string `json:"error"`
 
-	// 元信息展示字段
-	PublishDate string `json:"publishDate"` // 发布日期
-	Platform    string `json:"platform"`    // 平台 (如 windows, darwin, linux)
-	Arch        string `json:"arch"`        // 架构 (如 amd64, arm64)
-	Filetype    string `json:"filetype"`    // 文件类型 (如 .exe, .dmg)
-	AssetSize   string `json:"assetSize"`   // 格式化后的文件大小 (如 12.5 MB)
+	PublishDate string `json:"publishDate"`
+	Platform    string `json:"platform"`
+	Arch        string `json:"arch"`
+	Filetype    string `json:"filetype"`
+	AssetSize   string `json:"assetSize"`
 }
 
 // GetUpdateInfo 通过 Wails 内置更新器查询更新状态，返回给前端。
@@ -991,7 +1005,6 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 	ctx, cancel := context.WithTimeout(context.Background(), updater.CheckTimeout)
 	defer cancel()
 
-	// 1. 直接调用 Wails 的 Updater，自动享受代理加速！
 	rel, err := g.updaterApp.Updater.Check(ctx)
 	if err != nil {
 		return UpdateInfo{Error: "检查更新失败: " + err.Error()}
@@ -1002,7 +1015,6 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 		current = "0.0.0"
 	}
 
-	// 2. 如果 rel 为 nil，说明已经是最新版本
 	if rel == nil {
 		return UpdateInfo{
 			HasUpdate:      false,
@@ -1010,20 +1022,15 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 		}
 	}
 
-	// 3. Wails 引擎返回的 rel.Version 可能没有 v 前缀，我们补上以匹配 GitHub Tag
 	tagName := rel.Version
 	if !strings.HasPrefix(tagName, "v") {
 		tagName = "v" + tagName
 	}
 
-	// 拼出 Release 页面链接
 	targetURL := fmt.Sprintf("https://github.com/sinspired/subs-free/releases/tag/%s", tagName)
-
-	// 计算文件大小 (MB)
 	sizeMB := float64(rel.Artifact.Size) / (1024 * 1024)
 	sizeStr := fmt.Sprintf("%.2f MB", sizeMB)
 
-	// 格式化发布时间 (只取日期部分，或者加时间也可以)
 	pubDate := ""
 	if !rel.PublishedAt.IsZero() {
 		pubDate = rel.PublishedAt.Format("2006-01-02")
@@ -1035,17 +1042,15 @@ func (g *GuiApp) GetUpdateInfo() UpdateInfo {
 		CurrentVersion: current,
 		ReleaseNotes:   rel.Notes,
 		DownloadURL:    updater.GhProxyBase + targetURL,
-		// 赋值新增字段
-		PublishDate: pubDate,
-		Platform:    rel.Artifact.Platform,
-		Arch:        rel.Artifact.Arch,
-		Filetype:    rel.Artifact.Filetype,
-		AssetSize:   sizeStr,
+		PublishDate:    pubDate,
+		Platform:       rel.Artifact.Platform,
+		Arch:           rel.Artifact.Arch,
+		Filetype:       rel.Artifact.Filetype,
+		AssetSize:      sizeStr,
 	}
 }
 
 // OpenFilesWindow 打开或聚焦「内置文件」独立窗口（单例模式）。
-// 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
 func (g *GuiApp) OpenFilesWindow() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -1085,9 +1090,6 @@ func (g *GuiApp) OpenFilesWindow() {
 }
 
 // OpenAnalysisWindow 打开或聚焦「分析报告」独立窗口（单例模式）。
-// 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
-// OpenAnalysisWindow 打开或聚焦「分析报告」独立窗口（单例模式）。
-// 通过 /gui/enter nonce 中转，自动完成 API Key 写入，无需用户手动登录。
 func (g *GuiApp) OpenAnalysisWindow() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -1189,7 +1191,6 @@ func (g *GuiApp) OpenSubLinksWindow() {
 			return
 		}
 
-		// 动态计算窗口高度：Mac 因为红绿灯预留了 padding，需增加 18px 高度
 		winHeight := 545
 		minHeight := 545
 		maxHeight := 560
@@ -1200,11 +1201,9 @@ func (g *GuiApp) OpenSubLinksWindow() {
 			maxHeight = 575
 		}
 
-		// 根据网卡数量动态调整宽度
 		ips := getLocalIPv4s()
 		baseWidth := 520
 
-		// 每个 IP 增加一定宽度，比如 120px
 		Width := baseWidth + (len(ips)-2)*120
 		MinWidth := Width - 0
 		maxWidth := Width + 20
@@ -1248,7 +1247,6 @@ type CheckState struct {
 
 // GetCheckState 返回当前后端的检测进度状态，供灵动岛等前端页面调用
 func (g *GuiApp) GetCheckState() CheckState {
-	// 防止端口冲突未解决时（内核还未启动）前端轮询导致的空指针 Panic
 	if g.backend == nil || g.pendingInit {
 		return CheckState{
 			IsChecking: false,
