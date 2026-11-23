@@ -32,14 +32,14 @@ type GuiApp struct {
 	configPath string
 	backend    *coreapp.App
 
-	// loginWin 登录小窗（按需创建，关闭/最小化时销毁）。
+	// loginWin 登录小窗（按需创建；进入 WebUI / 最小化 / 收进托盘时销毁）。
 	loginWin *application.WebviewWindow
-	// webUIWin WebUI 大窗（进入管理界面时按需创建，关闭/最小化时销毁）。
+	// webUIWin WebUI 大窗（进入管理界面时按需创建；点击 × 关闭销毁并回登录窗，最小化则隐藏进托盘保留状态）。
 	webUIWin *application.WebviewWindow
 
-	// loginClosing 为 true 时表示代码主动销毁登录窗（进 WebUI / 最小化 / 最小化到托盘），不弹退出确认框。
+	// loginClosing 为 true 时放行登录窗直接销毁（不弹出退出确认框）。
 	loginClosing atomic.Bool
-	// webUISilentClose 为 true 时表示返回登录页 / 最小化 / 代码隐藏触发的销毁，不重复弹「后台运行」通知。
+	// webUISilentClose 为 true 时表示代码主动关闭 WebUI（如 BackToLogin / HideToTray），不重复触发再打开登录窗。
 	webUISilentClose atomic.Bool
 
 	// autostartMenuItem 托盘菜单中"开机自启"菜单项的引用。
@@ -58,8 +58,7 @@ type GuiApp struct {
 	analysisWin *application.WebviewWindow
 
 	// updateWin 自定义更新窗口（懒加载，复用）。
-	updateWin *application.WebviewWindow
-	// updateWinUnsubs 当前更新窗口注册的事件取消函数，关闭窗口时统一清理。
+	updateWin       *application.WebviewWindow
 	updateWinUnsubs []func()
 
 	// autostart Wails 跨平台开机自启管理器
@@ -74,36 +73,24 @@ type GuiApp struct {
 
 // AppInfo 前端展示所需的应用运行信息。
 type AppInfo struct {
-	APIKey       string `json:"apiKey"`
-	ListenPort   string `json:"listenPort"`
-	SubStorePort string `json:"subStorePort"`
-	// SubStorePath Sub-Store 后端 API 路径（config.yaml 中的 sub-store-path）。
-	SubStorePath string `json:"subStorePath"`
-	// KeyIsRandom 为 true 表示 api-key 随机生成（重启后变更）
-	KeyIsRandom bool `json:"keyIsRandom"`
-	// IsFirstRun 为 true 表示本次是首次运行
-	IsFirstRun bool `json:"isFirstRun"`
-	// ConfigPath config.yaml 的实际路径
-	ConfigPath string `json:"configPath"`
-	// PortConflictHTTP 为 true 表示 HTTP 端口被占用
-	PortConflictHTTP bool `json:"portConflictHTTP"`
-	// PortConflictSubStore 为 true 表示 Sub-Store 端口被占用
-	PortConflictSubStore bool `json:"portConflictSubStore"`
-	// PendingInit 为 true 表示后端尚未初始化，需要前端先解决端口冲突
-	PendingInit bool `json:"pendingInit"`
-	// AutostartEnabled 当前平台开机自启状态
-	AutostartEnabled bool `json:"autostartEnabled"`
-	// GuiVersion 桌面客户端版本（ldflags 注入，如 "v1.2.0"）
-	GuiVersion string `json:"guiVersion"`
-	// CoreVersion 内核版本+短提交哈希（如 "v2.5.4@7c23868"）
-	CoreVersion string `json:"coreVersion"`
-	// OriginVersion 内核版本
-	OriginVersion string `json:"originVersion"`
-	// LocalIPs 本机所有可用局域网 IPv4 地址（不含回环），供订阅链接窗口切换访问地址。
-	LocalIPs []string `json:"localIPs"`
+	APIKey               string   `json:"apiKey"`
+	ListenPort           string   `json:"listenPort"`
+	SubStorePort         string   `json:"subStorePort"`
+	SubStorePath         string   `json:"subStorePath"`
+	KeyIsRandom          bool     `json:"keyIsRandom"`
+	IsFirstRun           bool     `json:"isFirstRun"`
+	ConfigPath           string   `json:"configPath"`
+	PortConflictHTTP     bool     `json:"portConflictHTTP"`
+	PortConflictSubStore bool     `json:"portConflictSubStore"`
+	PendingInit          bool     `json:"pendingInit"`
+	AutostartEnabled     bool     `json:"autostartEnabled"`
+	GuiVersion           string   `json:"guiVersion"`
+	CoreVersion          string   `json:"coreVersion"`
+	OriginVersion        string   `json:"originVersion"`
+	LocalIPs             []string `json:"localIPs"`
 }
 
-// getLocalIPv4s 枚举本机所有活动网络接口上的 IPv4 地址（排除回环、未启用接口）。
+// getLocalIPv4s 枚举本机所有活动网络接口上的 IPv4 地址。
 func getLocalIPv4s() []string {
 	var ips []string
 	ifaces, err := net.Interfaces()
@@ -139,7 +126,7 @@ func getLocalIPv4s() []string {
 	return ips
 }
 
-// createLoginWindow 在主线程创建或聚焦登录小窗（启动时同步调用，运行时通过 openLoginWindow 调度）。
+// createLoginWindow 在主线程创建或聚焦登录小窗。
 func (g *GuiApp) createLoginWindow() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -150,6 +137,9 @@ func (g *GuiApp) createLoginWindow() {
 	}
 
 	if g.loginWin != nil {
+		if g.loginWin.IsMinimised() {
+			g.loginWin.UnMinimise()
+		}
 		g.loginWin.Show()
 		g.loginWin.Focus()
 		windowVisible.Store(true)
@@ -188,10 +178,11 @@ func (g *GuiApp) createLoginWindow() {
 	g.loginWin = win
 	windowVisible.Store(true)
 
+	// 点击登录窗口 ×：拦截并弹出 QuitDialog，由用户选择「退出」或「收进系统托盘」
 	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		if g.loginClosing.CompareAndSwap(true, false) {
 			g.loginWin = nil
-			if g.webUIWin == nil {
+			if g.webUIWin == nil || !g.webUIWin.IsVisible() {
 				windowVisible.Store(false)
 			}
 			return
@@ -200,19 +191,19 @@ func (g *GuiApp) createLoginWindow() {
 		win.EmitEvent("window:close-requested", nil)
 	})
 
-	// 最小化时直接销毁登录小窗释放 WebView2 内存，点托盘图标可重新打开
+	// 登录窗口点最小化：直接销毁登录窗收进托盘省内存，点击托盘重新打开
 	win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
 		g.closeLoginWindow()
-		sendOSNotification("Subs Check PRO GUI", "已最小化到系统托盘，点击托盘图标可重新打开")
+		sendOSNotification("Subs Check PRO GUI", "登录窗口已最小化到系统托盘")
 	})
 }
 
-// openLoginWindow 从任意线程安全唤起默认登录窗口。
+// openLoginWindow 从任意 goroutine 安全唤起登录窗口。
 func (g *GuiApp) openLoginWindow() {
 	application.InvokeAsync(g.createLoginWindow)
 }
 
-// closeLoginWindow 直接销毁登录小窗进程（不弹退出确认框）。
+// closeLoginWindow 主动销毁登录窗口（不触发 QuitDialog）。
 func (g *GuiApp) closeLoginWindow() {
 	application.InvokeAsync(func() {
 		if g.loginWin == nil {
@@ -223,17 +214,7 @@ func (g *GuiApp) closeLoginWindow() {
 	})
 }
 
-// closeWebUIWindow 直接销毁管理面板进程。
-func (g *GuiApp) closeWebUIWindow() {
-	application.InvokeAsync(func() {
-		if g.webUIWin == nil {
-			return
-		}
-		g.webUIWin.Close()
-	})
-}
-
-// NotifyAutostartChanged 安全向登录窗同步开机自启状态变更事件。
+// NotifyAutostartChanged 安全同步开机自启状态到登录窗。
 func (g *GuiApp) NotifyAutostartChanged(enabled bool) {
 	application.InvokeAsync(func() {
 		if g.loginWin != nil {
@@ -271,7 +252,7 @@ func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 	})
 }
 
-// EnterWebUI 由前端调用：按需创建本地 WebUI 大窗，同时销毁登录小窗释放内存。
+// EnterWebUI 由前端调用：按需创建并进入 WebUI 大窗，同时销毁登录小窗。
 func (g *GuiApp) EnterWebUI() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -284,11 +265,15 @@ func (g *GuiApp) EnterWebUI() {
 		g.inWebUI.Store(true)
 
 		if g.webUIWin != nil {
+			if g.webUIWin.IsMinimised() {
+				g.webUIWin.UnMinimise()
+			}
 			g.webUIWin.SetURL(adminURL)
 			g.webUIWin.Show()
 			g.webUIWin.Center()
 			g.webUIWin.Focus()
 			windowVisible.Store(true)
+			g.webUIWin.EmitEvent("webui:visibility", true)
 		} else {
 			win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 				Name:          "webui",
@@ -319,29 +304,38 @@ func (g *GuiApp) EnterWebUI() {
 			g.webUIWin = win
 			windowVisible.Store(true)
 
-			// 关闭按钮：直接销毁 WebView2 进程，复位为下次点击托盘打开默认登录窗口
+			// 1. WebUI 点击关闭 ×：直接销毁 WebUI 窗口释放 WebView2 进程，并回到登录窗口
 			win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 				g.webUIWin = nil
 				g.inWebUI.Store(false)
-				if g.loginWin == nil {
-					windowVisible.Store(false)
+				if g.webUISilentClose.CompareAndSwap(true, false) {
+					return
 				}
-				if !g.webUISilentClose.CompareAndSwap(true, false) {
-					sendOSNotification(
-						"Subs Free 后台运行",
-						"已释放管理面板进程，点击托盘图标可重新打开",
-					)
-				}
+				g.openLoginWindow()
 			})
 
-			// 最小化按钮：直接销毁 WebView2 进程释放内存，点击托盘重新打开默认登录窗口
+			// 2. WebUI 点击最小化 _：隐藏收进托盘并暂停前端轮询/动画，保留原窗口状态
 			win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-				g.webUISilentClose.Store(true)
-				g.closeWebUIWindow()
-				sendOSNotification(
-					"Subs Check PRO",
-					"管理界面已最小化到系统托盘，点击托盘图标可重新打开",
-				)
+				hideWindow(win)
+				sendOSNotification("Subs Check PRO", "管理界面已最小化到系统托盘，点击托盘图标可恢复")
+			})
+
+			// 同步隐藏/显示状态给前端，确保最小化到托盘期间零后台轮询、不泄露内存
+			win.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
+				windowVisible.Store(false)
+				win.EmitEvent("webui:visibility", false)
+			})
+			win.OnWindowEvent(events.Common.WindowShow, func(e *application.WindowEvent) {
+				windowVisible.Store(true)
+				win.EmitEvent("webui:visibility", true)
+			})
+			win.OnWindowEvent(events.Common.WindowUnMinimise, func(e *application.WindowEvent) {
+				windowVisible.Store(true)
+				win.EmitEvent("webui:visibility", true)
+			})
+			win.OnWindowEvent(events.Common.WindowRestore, func(e *application.WindowEvent) {
+				windowVisible.Store(true)
+				win.EmitEvent("webui:visibility", true)
 			})
 
 			win.Show()
@@ -349,7 +343,7 @@ func (g *GuiApp) EnterWebUI() {
 			win.Focus()
 		}
 
-		// 进入管理面板后立即销毁登录窗，减少一个 WebView2 进程
+		// 进入管理界面后销毁登录小窗，避免额外常驻一个 WebView2 进程
 		if g.loginWin != nil {
 			g.loginClosing.Store(true)
 			g.loginWin.Close()
@@ -381,7 +375,7 @@ func (g *GuiApp) GetConfigPath() string {
 	return g.configPath
 }
 
-// BackToLogin 从 WebUI 返回登录窗口（销毁管理面板并重新打开登录窗）
+// BackToLogin 从 WebUI 返回登录窗口（销毁 WebUI 进程并打开登录窗口）
 func (g *GuiApp) BackToLogin() {
 	g.inWebUI.Store(false)
 	g.openLoginWindow()
@@ -484,7 +478,7 @@ func (g *GuiApp) ValidateConfigKey(enteredKey string, remember bool) (string, er
 	return generateNonce(actual, remember), nil
 }
 
-// peekConfigAPIKey 在不影响当前运行配置的前提下，直接读取并解析指定配置文件中的 api-key。
+// peekConfigAPIKey 读取并解析指定配置文件中的 api-key。
 func peekConfigAPIKey(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -565,7 +559,7 @@ func waitForPortRelease(port string, timeout time.Duration) {
 	slog.Warn("SwitchConfigFile：等待端口释放超时，继续尝试初始化新内核", "port", port)
 }
 
-// ValidatePort 实时验证单个端口号合法性（格式 + 是否被占用）。
+// ValidatePort 实时验证单个端口号合法性。
 func (g *GuiApp) ValidatePort(port string) string {
 	p := normalizePort(port)
 	if err := validatePort(p); err != nil {
@@ -587,23 +581,14 @@ func (g *GuiApp) ShowWindow() {
 	g.openLoginWindow()
 }
 
-// HideToTray 供前端"关闭按钮对话框"选择最小化时调用：直接销毁窗口，只留托盘。
+// HideToTray 供登录窗"关闭确认对话框"选择「收进系统托盘」时调用：销毁登录窗，只留托盘与内核后台运行。
 func (g *GuiApp) HideToTray() {
 	g.inWebUI.Store(false)
-	application.InvokeAsync(func() {
-		if g.webUIWin != nil {
-			g.webUISilentClose.Store(true)
-			g.webUIWin.Close()
-		}
-		if g.loginWin != nil {
-			g.loginClosing.Store(true)
-			g.loginWin.Close()
-		}
-	})
-	sendOSNotification("Subs Check PRO", "GUI已最小化到系统托盘")
+	g.closeLoginWindow()
+	sendOSNotification("Subs Check PRO", "GUI已收进系统托盘，后台持续运行")
 }
 
-// QuitApp 供前端"关闭按钮对话框"选择退出时调用。
+// QuitApp 供前端"关闭确认对话框"选择退出时调用。
 func (g *GuiApp) QuitApp() {
 	sendOSNotification("Subs Check PRO", "GUI正在关闭…")
 	app := application.Get()
@@ -612,7 +597,7 @@ func (g *GuiApp) QuitApp() {
 	}
 }
 
-// OpenConfigFile 打开系统文件选择对话框，返回用户选择的配置文件路径。
+// OpenConfigFile 打开系统文件选择对话框。
 func (g *GuiApp) OpenConfigFile() (string, error) {
 	app := application.Get()
 	if app == nil {
@@ -639,26 +624,26 @@ func (g *GuiApp) OpenConfigFile() (string, error) {
 
 // ── 双窗口调度辅助 ───────────────────────────────────────────────────────────
 
-// showActiveWindow 点击托盘或二次启动时唤起窗口：管理面板已销毁则打开默认登录窗口。
+// showActiveWindow 从托盘/二次启动恢复窗口：
+// 若此前是在 WebUI 最小化收进托盘，则恢复原先的 WebUI 窗口；否则打开默认登录窗口。
 func (g *GuiApp) showActiveWindow() {
 	application.InvokeAsync(func() {
 		if g.inWebUI.Load() && g.webUIWin != nil {
-			g.webUIWin.Show()
-			g.webUIWin.Focus()
-			windowVisible.Store(true)
+			showWindow(g.webUIWin)
 			return
 		}
+		g.inWebUI.Store(false)
 		g.createLoginWindow()
 	})
 }
 
-// hideActiveWindow 隐藏/释放当前活动窗口到托盘。
+// hideActiveWindow 将当前活动窗口收进托盘：
+// WebUI 仅隐藏并暂停前端（保留原窗口状态）；登录窗直接销毁省内存。
 func (g *GuiApp) hideActiveWindow() {
-	g.inWebUI.Store(false)
 	application.InvokeAsync(func() {
-		if g.webUIWin != nil {
-			g.webUISilentClose.Store(true)
-			g.webUIWin.Close()
+		if g.inWebUI.Load() && g.webUIWin != nil {
+			hideWindow(g.webUIWin)
+			return
 		}
 		if g.loginWin != nil {
 			g.loginClosing.Store(true)

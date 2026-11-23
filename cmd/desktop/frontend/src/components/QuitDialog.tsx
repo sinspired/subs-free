@@ -48,7 +48,7 @@ export function QuitDialog({ onClose }: Props) {
 
             <div class="quit-btn-content">
               <div class="quit-btn-title">
-                最小化到托盘
+                后台运行
               </div>
 
               <div class="quit-btn-sub">

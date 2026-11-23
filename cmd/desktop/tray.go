@@ -172,7 +172,7 @@ func buildTrayMenu(
 
 	menu.Add("隐藏主界面").OnClick(func(_ *application.Context) {
 		guiApp.hideActiveWindow()
-		sendOSNotification("Subs Free", "已最小化到系统托盘\n单击图标可重新打开")
+		sendOSNotification("Subs Free", "已最小化到系统托盘\n单击图标可恢复窗口")
 	})
 
 	menu.AddSeparator()
@@ -281,7 +281,7 @@ func buildTrayMenu(
 		onQuit()
 	})
 
-	// 初始化 Notch Window (仅 macOS 灵动岛生效，避免 Windows 创建多余 WebView2 进程)
+	// 初始化 Notch Window (仅 macOS 灵动岛生效，避免 Windows 多开一个 WebView2 进程)
 	showNotch := func() {}
 	hideNotch := func() {}
 	if runtime.GOOS == "darwin" {
@@ -436,15 +436,24 @@ func waitForBackendIdle(timeout time.Duration) {
 // ── 窗口显示/隐藏辅助 ─────────────────────────────────────────────────────────
 
 func showWindow(win *application.WebviewWindow) {
+	if win.IsMinimised() {
+		win.UnMinimise()
+	}
 	win.Show()
 	win.Focus()
 	windowVisible.Store(true)
+	if win.Name() == "webui" {
+		win.EmitEvent("webui:visibility", true)
+	}
 	slog.Debug("窗口已显示")
 }
 
 func hideWindow(win *application.WebviewWindow) {
 	win.Hide()
 	windowVisible.Store(false)
+	if win.Name() == "webui" {
+		win.EmitEvent("webui:visibility", false)
+	}
 	slog.Debug("窗口已隐藏到托盘")
 }
 

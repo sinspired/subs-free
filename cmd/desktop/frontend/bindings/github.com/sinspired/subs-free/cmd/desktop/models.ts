@@ -8,65 +8,17 @@ export interface AppInfo {
     "apiKey": string;
     "listenPort": string;
     "subStorePort": string;
-
-    /**
-     * SubStorePath Sub-Store 后端 API 路径（config.yaml 中的 sub-store-path）。
-     */
     "subStorePath": string;
-
-    /**
-     * KeyIsRandom 为 true 表示 api-key 随机生成（重启后变更）
-     */
     "keyIsRandom": boolean;
-
-    /**
-     * IsFirstRun 为 true 表示本次是首次运行
-     */
     "isFirstRun": boolean;
-
-    /**
-     * ConfigPath config.yaml 的实际路径
-     */
     "configPath": string;
-
-    /**
-     * PortConflictHTTP 为 true 表示 HTTP 端口被占用
-     */
     "portConflictHTTP": boolean;
-
-    /**
-     * PortConflictSubStore 为 true 表示 Sub-Store 端口被占用
-     */
     "portConflictSubStore": boolean;
-
-    /**
-     * PendingInit 为 true 表示后端尚未初始化，需要前端先解决端口冲突
-     */
     "pendingInit": boolean;
-
-    /**
-     * AutostartEnabled 当前平台开机自启状态
-     */
     "autostartEnabled": boolean;
-
-    /**
-     * GuiVersion 桌面客户端版本（ldflags 注入，如 "v1.2.0"）
-     */
     "guiVersion": string;
-
-    /**
-     * CoreVersion 内核版本+短提交哈希（如 "v2.5.4@7c23868"）
-     */
     "coreVersion": string;
-
-    /**
-     * OriginVersion 内核版本
-     */
     "originVersion": string;
-
-    /**
-     * LocalIPs 本机所有可用局域网 IPv4 地址（不含回环），供订阅链接窗口切换访问地址。
-     */
     "localIPs": string[] | null;
 }
 

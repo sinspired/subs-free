@@ -32,12 +32,9 @@ func main() {
 	InitNotifier(notifier)
 
 	// 轻量级初始化（Wails 就绪前）
-	// 仅加载配置、创建结构体，不启动后端，规避 updater helper 实例
-	// 提前拉起 Node 子进程后直接退出留下幽灵进程的问题。
 	coreApp, guiApp := setupApp()
 	globalGuiApp = guiApp
 
-	// TODO:处理右键菜单
 	wailsApp := application.New(application.Options{
 		Name:        "Subs Free",
 		Description: "订阅检测桌面管理面板",
@@ -47,23 +44,18 @@ func main() {
 			application.NewService(&Notifier{}),
 		},
 		Assets: application.AssetOptions{
-			// configPath 仅供 handler 定位静态资源目录，此处仍传字符串保持兼容。
-			// admin.html 读取配置路径的正确方式是 EnterWebUI 写入的 URL 查询参数，
-			// 而非此处注入的快照值（切换配置后快照不再更新）。
-			// 若 newCombinedAssetHandler 内部也注入了 configPath，需将其第一个参数
-			// 类型改为 func() string 并传入 guiApp.GetConfigPath，才能彻底修复。
 			Handler: newCombinedAssetHandler(guiApp.GetConfigPath, guiApp.GetListenPort),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		Windows: application.WindowsOptions{
-			// 关键配置：允许销毁全部窗口后继续保持托盘和 Go 后端在后台运行
+			// 关键配置：允许销毁所有窗口（例如收进托盘时销毁登录窗）而不退出应用
 			DisableQuitOnLastWindowClosed: true,
 			UseVisualHosting:              true,
 		},
 
-		// 第二次启动时：唤醒第一实例（若窗口已销毁则重新拉起默认登录窗口）
+		// 第二次启动时：唤醒第一实例
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID:      "com.sinspired.subs_free",
 			EncryptionKey: singleInstanceKey,
@@ -94,7 +86,7 @@ func main() {
 			CurrentVersion: currentVer,
 			Providers:      []updater.Provider{ghProvider},
 			CheckInterval:  6 * time.Hour,
-			Window:         updater.WindowNone, // 不弹窗
+			Window:         updater.WindowNone,
 		}); err != nil {
 			slog.Warn("Updater: Init 失败", "error", err)
 		} else {
@@ -104,15 +96,12 @@ func main() {
 	guiApp.updaterApp = wailsApp
 	guiApp.autostart = wailsApp.Autostart
 
-	// 启动时仅创建登录小窗；webUIWin 改为进入管理界面时按需创建，关闭/最小化即销毁释放内存
+	// 启动时只创建登录窗口；WebUI 窗口在点击「进入管理界面」时再按需创建
 	guiApp.createLoginWindow()
 
 	// 退出生命周期清理
 	wailsApp.OnShutdown(func() {
 		slog.Info("GUI 程序正在退出，执行清理工作…")
-		// 使用 guiApp.backend 而非初始的 coreApp：
-		// SwitchConfigFile 调用后 guiApp.backend 已指向新内核，
-		// 若此处继续使用 coreApp 则会对已关闭的旧实例执行二次 Shutdown。
 		if guiApp.IsBackendReady() {
 			if err := guiApp.backend.Shutdown(); err != nil {
 				slog.Error("关闭应用失败", "error", err)
@@ -130,7 +119,6 @@ func main() {
 		appInitOK := startBackend(coreApp)
 		slog.Debug("Wails 就绪，后端初始化完成", "appReady", appInitOK)
 
-		// 启动时检查更新
 		go guiupdater.CheckUpdateStatus(wailsApp)
 	})
 

@@ -19,7 +19,7 @@ import * as updater$0 from "../../updater/models.js";
 import * as $models from "./models.js";
 
 /**
- * BackToLogin 从 WebUI 返回登录窗口（销毁管理面板并重新打开登录窗）
+ * BackToLogin 从 WebUI 返回登录窗口（销毁 WebUI 进程并打开登录窗口）
  */
 export function BackToLogin(): $CancellablePromise<void> {
     return $Call.ByID(2210097929);
@@ -40,7 +40,7 @@ export function CompleteInit(): $CancellablePromise<void> {
 }
 
 /**
- * EnterWebUI 由前端调用：按需创建本地 WebUI 大窗，同时销毁登录小窗释放内存。
+ * EnterWebUI 由前端调用：按需创建并进入 WebUI 大窗，同时销毁登录小窗。
  */
 export function EnterWebUI(): $CancellablePromise<void> {
     return $Call.ByID(551937120);
@@ -107,7 +107,7 @@ export function GetUpdateStatus(): $CancellablePromise<updater$0.UpdateStatus> {
 }
 
 /**
- * HideToTray 供前端"关闭按钮对话框"选择最小化时调用：直接销毁窗口，只留托盘。
+ * HideToTray 供登录窗"关闭确认对话框"选择「收进系统托盘」时调用：销毁登录窗，只留托盘与内核后台运行。
  */
 export function HideToTray(): $CancellablePromise<void> {
     return $Call.ByID(171980759);
@@ -121,7 +121,7 @@ export function IsBackendReady(): $CancellablePromise<boolean> {
 }
 
 /**
- * NotifyAutostartChanged 安全向登录窗同步开机自启状态变更事件。
+ * NotifyAutostartChanged 安全同步开机自启状态到登录窗。
  */
 export function NotifyAutostartChanged(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(943159520, enabled);
@@ -149,7 +149,7 @@ export function OpenBrandURL(url: string, windowSize: string): $CancellablePromi
 }
 
 /**
- * OpenConfigFile 打开系统文件选择对话框，返回用户选择的配置文件路径。
+ * OpenConfigFile 打开系统文件选择对话框。
  */
 export function OpenConfigFile(): $CancellablePromise<string> {
     return $Call.ByID(1547608438);
@@ -184,7 +184,7 @@ export function OpenSubStoreWindow(): $CancellablePromise<void> {
 }
 
 /**
- * QuitApp 供前端"关闭按钮对话框"选择退出时调用。
+ * QuitApp 供前端"关闭确认对话框"选择退出时调用。
  */
 export function QuitApp(): $CancellablePromise<void> {
     return $Call.ByID(1033637092);
@@ -233,7 +233,7 @@ export function ValidateConfigKey(enteredKey: string, remember: boolean): $Cance
 }
 
 /**
- * ValidatePort 实时验证单个端口号合法性（格式 + 是否被占用）。
+ * ValidatePort 实时验证单个端口号合法性。
  */
 export function ValidatePort(port: string): $CancellablePromise<string> {
     return $Call.ByID(2902552419, port);
