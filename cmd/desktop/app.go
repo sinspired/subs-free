@@ -3,17 +3,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net"
-	"net/url"
-	"os"
-	"runtime"
-	"strconv"
-	"strings"
-	"sync/atomic"
-	"time"
-
 	coreapp "github.com/sinspired/subs-check-pro/v3/app"
 	"github.com/sinspired/subs-check-pro/v3/config"
 	"github.com/sinspired/subs-check-pro/v3/utils"
@@ -22,6 +13,16 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
 	"gopkg.in/yaml.v3"
+	"log/slog"
+	"net"
+	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"time"
 )
 
 // globalGuiApp 包级指针，供 router handler（如 handleGuiBackToLogin）访问。
@@ -72,6 +73,10 @@ type GuiApp struct {
 
 	// onTraySync 由 tray.go 注入，用于在窗口状态变更时立即刷新托盘菜单语义
 	onTraySync func()
+
+	silentAutostartMenuItem *application.MenuItem
+
+	autostartCached atomic.Bool
 }
 
 // AppInfo 前端展示所需的应用运行信息。
@@ -831,23 +836,114 @@ func (g *GuiApp) GetAutoStartEnabled() (bool, error) {
 	return g.autostart.IsEnabled()
 }
 
-// SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用）。
-func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
-	if enable {
-		return g.autostart.Enable()
-	}
-	return g.autostart.Disable()
+// ── GUI 偏好持久化（仅存轻量的自启偏好）──────────────────────────────────────
+
+type guiPrefs struct {
+	SilentAutostart bool `json:"silentAutostart"`
 }
 
-// SetAutoStart 供前端 JS 绑定调用，切换开机自启。
+func guiPrefsPath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil || dir == "" {
+		return "gui-prefs.json"
+	}
+	return filepath.Join(dir, "subs-free", "gui-prefs.json")
+}
+
+func loadGuiPrefs() guiPrefs {
+	var p guiPrefs
+	data, err := os.ReadFile(guiPrefsPath())
+	if err != nil {
+		return p
+	}
+	_ = json.Unmarshal(data, &p)
+	return p
+}
+
+func saveGuiPrefs(p guiPrefs) error {
+	path := guiPrefsPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func (g *GuiApp) applyAutostart(enabled, silent bool) error {
+	if !enabled {
+		return g.autostart.Disable()
+	}
+	if silent {
+		// 使用 Wails v3 EnableWithOptions 注入 --hidden 启动参数
+		return g.autostart.EnableWithOptions(application.AutostartOptions{
+			Arguments: []string{"--hidden"},
+		})
+	}
+	return g.autostart.Enable()
+}
+
+// GetSilentAutoStartEnabled 读取是否开启「静默自启」。
+func (g *GuiApp) GetSilentAutoStartEnabled() bool {
+	return loadGuiPrefs().SilentAutostart
+}
+
+// SetSilentAutoStart 切换「静默自启」；若开机自启已开启，立即覆盖系统自启注册项。
+func (g *GuiApp) SetSilentAutoStart(silent bool) error {
+	prefs := loadGuiPrefs()
+	prefs.SilentAutostart = silent
+	if err := saveGuiPrefs(prefs); err != nil {
+		return err
+	}
+
+	if g.silentAutostartMenuItem != nil {
+		g.silentAutostartMenuItem.SetChecked(silent)
+	}
+
+	if enabled, err := g.autostart.IsEnabled(); err == nil && enabled {
+		if err := g.applyAutostart(true, silent); err != nil {
+			return err
+		}
+	}
+	g.NotifyAutostartChanged(silent)
+	return nil
+}
+
+// SetAutoStart 供前端 JS 绑定调用，切换开机自启（联动控制托盘「静默自启」子选项显隐）。
 func (g *GuiApp) SetAutoStart(enabled bool) error {
+	silent := loadGuiPrefs().SilentAutostart
+	if err := g.applyAutostart(enabled, silent); err != nil {
+		return err
+	}
+	g.autostartCached.Store(enabled)
 	if g.autostartMenuItem != nil {
 		g.autostartMenuItem.SetChecked(enabled)
 	}
-	if enabled {
-		return g.autostart.Enable()
+	if g.silentAutostartMenuItem != nil {
+		g.silentAutostartMenuItem.SetHidden(!enabled)
 	}
-	return g.autostart.Disable()
+	if g.onTraySync != nil {
+		application.InvokeAsync(g.onTraySync)
+	}
+	return nil
+}
+
+// SetAutoStartEnabled 供托盘菜单内部调用，切换开机自启。
+func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
+	silent := loadGuiPrefs().SilentAutostart
+	if err := g.applyAutostart(enable, silent); err != nil {
+		return err
+	}
+	g.autostartCached.Store(enable)
+	if g.silentAutostartMenuItem != nil {
+		g.silentAutostartMenuItem.SetHidden(!enable)
+	}
+	if g.onTraySync != nil {
+		application.InvokeAsync(g.onTraySync)
+	}
+	return nil
 }
 
 // OpenInternalPage 在新窗口中打开内置 Web 页面（如 /files、/analysis）。

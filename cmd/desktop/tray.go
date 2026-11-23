@@ -181,7 +181,7 @@ func buildTrayMenu(
 	var lastMenuKey string
 	syncTrayMenu := func() {
 		st := guiApp.GetTrayWindowState()
-		key := fmt.Sprintf("%s:%v", st.Mode, st.IsVisible)
+		key := fmt.Sprintf("%s:%v:%v", st.Mode, st.IsVisible, guiApp.autostartCached.Load())
 		if key == lastMenuKey {
 			return
 		}
@@ -272,11 +272,15 @@ func buildTrayMenu(
 
 	menu.AddSeparator()
 
-	// ── 开机自启（Checkbox 菜单项）────────────────────────────────────────
+	// ── 开机自启 & 静默自启（子选项）────────────────────────────────────────
 	autostartItem := menu.Add("开机自启")
 	autostartItem.SetChecked(false)
-
 	guiApp.autostartMenuItem = autostartItem
+
+	silentAutostartItem := menu.Add("  └ 静默自启（隐藏启动）")
+	silentAutostartItem.SetChecked(guiApp.GetSilentAutoStartEnabled())
+	silentAutostartItem.SetHidden(true) // 初始化前默认隐藏，待真实状态查明后联动显示
+	guiApp.silentAutostartMenuItem = silentAutostartItem
 
 	autostartItem.OnClick(func(_ *application.Context) {
 		enabled, err := guiApp.autostart.IsEnabled()
@@ -287,19 +291,37 @@ func buildTrayMenu(
 		}
 
 		next := !enabled
-		autostartItem.SetChecked(next)
-
-		if next {
-			err = guiApp.autostart.Enable()
-			sendOSNotification("Subs Free", "已设置开机自启")
-		} else {
-			err = guiApp.autostart.Disable()
-			sendOSNotification("Subs Free", "已取消开机自启")
-		}
-		guiApp.NotifyAutostartChanged(next)
-		if err != nil {
+		if err := guiApp.SetAutoStartEnabled(next); err != nil {
 			slog.Warn("设置开机自启失败", "error", err)
 			sendOSNotification("Subs Free", "设置开机自启失败："+err.Error())
+			return
+		}
+
+		autostartItem.SetChecked(next)
+		guiApp.NotifyAutostartChanged(next)
+
+		if next {
+			if guiApp.GetSilentAutoStartEnabled() {
+				sendOSNotification("Subs Free", "已开启开机静默自启")
+			} else {
+				sendOSNotification("Subs Free", "已设置开机自启")
+			}
+		} else {
+			sendOSNotification("Subs Free", "已取消开机自启")
+		}
+	})
+
+	silentAutostartItem.OnClick(func(_ *application.Context) {
+		next := !guiApp.GetSilentAutoStartEnabled()
+		if err := guiApp.SetSilentAutoStart(next); err != nil {
+			slog.Warn("设置静默自启失败", "error", err)
+			sendOSNotification("Subs Free", "设置静默自启失败："+err.Error())
+			return
+		}
+		if next {
+			sendOSNotification("Subs Free", "已开启静默自启")
+		} else {
+			sendOSNotification("Subs Free", "已关闭静默自启")
 		}
 	})
 
@@ -359,10 +381,14 @@ func buildTrayMenu(
 		}
 		autostartItem.SetChecked(enabled)
 
+		guiApp.autostartCached.Store(enabled)
+		silentAutostartItem.SetHidden(!enabled)
+		application.InvokeAsync(syncTrayMenu)
+
 		ticker := time.NewTicker(1000 * time.Millisecond)
 		defer ticker.Stop()
 
-for range ticker.C {
+		for range ticker.C {
 			application.InvokeAsync(syncTrayMenu)
 
 			if updateTooltip != nil {

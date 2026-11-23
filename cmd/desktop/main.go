@@ -96,6 +96,26 @@ func main() {
 	guiApp.updaterApp = wailsApp
 	guiApp.autostart = wailsApp.Autostart
 
+	// 解析 --hidden 启动参数（由 Wails AutostartOptions.Arguments 注入）
+	startHidden := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--hidden" {
+			startHidden = true
+			break
+		}
+	}
+
+	// 仅在「静默自启 且 无端口冲突」时隐藏启动；一旦端口冲突，必须弹窗让用户处理
+	if startHidden && !guiApp.pendingInit {
+		windowVisible.Store(false)
+		slog.Info("检测到 --hidden 参数，静默启动到系统托盘")
+	} else {
+		guiApp.createLoginWindow()
+		if startHidden && guiApp.pendingInit {
+			slog.Warn("检测到 --hidden 启动但存在端口冲突，已自动显示窗口")
+		}
+	}
+
 	// 启动时只创建登录窗口；WebUI 窗口在点击「进入管理界面」时再按需创建
 	guiApp.createLoginWindow()
 
@@ -118,6 +138,10 @@ func main() {
 	wailsApp.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
 		appInitOK := startBackend(coreApp)
 		slog.Debug("Wails 就绪，后端初始化完成", "appReady", appInitOK)
+
+		if startHidden && guiApp.pendingInit {
+			sendOSNotification("Subs Free 端口冲突", "检测到端口被占用，已为您打开端口设置窗口")
+		}
 
 		go guiupdater.CheckUpdateStatus(wailsApp)
 	})

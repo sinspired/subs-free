@@ -45,6 +45,8 @@ export function App() {
   const [cfgPath, setCfgPath] = useState('');
   const [showQuit, setShowQuit] = useState(false);
   const [autostartEnabled, setAutostart] = useState(false);
+  const [silentAutostart, setSilentAutostart] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   // 当 Wails updater 检测到新版本时为 true（按钮高亮提示）
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateVersion, setUpdateVersion] = useState('');
@@ -53,10 +55,12 @@ export function App() {
   useEffect(() => {
     if (!ready) return;
     loadAppInfo();
-    // 实时查询开机自启状态（不依赖 GetAppInfo 缓存值，确保与托盘菜单一致）
     GuiApp.GetAutoStartEnabled()
       .then(enabled => setAutostart(enabled))
-      .catch(() => { /* 平台不支持时静默忽略 */ });
+      .catch(() => { });
+    GuiApp.GetSilentAutoStartEnabled()
+      .then(silent => setSilentAutostart(silent))
+      .catch(() => { });
   }, [ready]);
 
 
@@ -127,20 +131,40 @@ export function App() {
     };
   }, [ready]);
 
-  // ── 监听托盘「开机自启」切换事件，回查系统真实状态后同步按钮 ──────────
-  // 注意：不直接使用事件 payload（Go bool 经 Wails v3 序列化后在 JS 侧
-  // 可能被包裹为 [false]，Boolean([false]) === true，导致「关闭」失效）。
-  // 改为事件仅作触发信号，收到后立即向 Go 回查真实状态，彻底规避此问题。
+  // ── 监听托盘「开机自启 / 静默自启」切换事件 ──
   useEffect(() => {
     if (!ready) return;
     const unsub = Events.On('autostart:changed', async () => {
       try {
-        const actual = await GuiApp.GetAutoStartEnabled();
+        const [actual, silent] = await Promise.all([
+          GuiApp.GetAutoStartEnabled(),
+          GuiApp.GetSilentAutoStartEnabled(),
+        ]);
         setAutostart(actual);
-      } catch { /* 平台不支持时静默忽略 */ }
+        setSilentAutostart(silent);
+      } catch { /* 忽略 */ }
     });
     return () => { unsub && unsub(); };
   }, [ready]);
+
+  // ── 点击外部或 Esc 自动关闭设置菜单 ──
+  useEffect(() => {
+    if (!showSettings) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('.brand-settings-menu') || t?.closest('.brand-settings-btn')) return;
+      setShowSettings(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettings(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showSettings]);
 
   async function loadAppInfo() {
     setView('loading');
@@ -200,6 +224,18 @@ export function App() {
     }
   }
 
+  async function handleToggleSilentAutostart() {
+    const next = !silentAutostart;
+    try {
+      await GuiApp.SetSilentAutoStart(next);
+      const actual = await GuiApp.GetSilentAutoStartEnabled();
+      setSilentAutostart(actual);
+      toast(actual ? '已开启静默自启' : '已关闭静默自启');
+    } catch (e: any) {
+      toast('设置失败：' + (e?.message ?? '功能暂不可用'));
+    }
+  }
+
   async function handleCheckForUpdates() {
     try {
       await GuiApp.CheckForUpdates();
@@ -208,58 +244,64 @@ export function App() {
     }
   }
 
-  // ── 左侧品牌面板（分栏视图专用）────────────────────────────────
-  const BrandPanel = () => (
+  // ── 左侧品牌面板（函数式渲染，避免开关菜单时重挂载 Logo）──────
+  const renderBrandPanel = () => (
     <aside class="brand-panel">
       {/* 品牌主体：大 Logo */}
       <div class="brand-body">
         <img src="/logo.svg" alt="logo" class="brand-icon" />
       </div>
 
-      {/* ── 底部工具行：开机自启 后台运行 | github tg docker | 检查更新 */}
-      <nav class="brand-links">
-        {/* 开机自启 */}
-        <button
-          class={`brand-autostart${autostartEnabled ? ' active' : ''}`}
-          onClick={handleToggleAutostart}
-          title={autostartEnabled ? '开机自启：已开启（点击关闭）' : '开机自启：已关闭（点击开启）'}
-        >
-          <svg
-            class="brand-icon"
-            viewBox="0 0 24 24"
-            width="15"
-            height="15"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
-            <line x1="12" y1="2" x2="12" y2="12" />
-          </svg>
-        </button>
+      {/* 选项弹出菜单（置于 brand-panel 内以完美居中不裁剪） */}
+      {showSettings && (
+        <div class="brand-settings-menu">
+          <div class="bsm-item" onClick={handleToggleAutostart}>
+            <div class="bsm-text">
+              <span class="bsm-title">开机自启</span>
+              <span class="bsm-sub">登录系统后自动启动</span>
+            </div>
+            <span class={`bsm-switch${autostartEnabled ? ' on' : ''}`} />
+          </div>
 
-        {/* 后台运行 */}
-        <button
-          class="brand-autostart"
-          onClick={() => GuiApp.HideToTray()}
-          title="后台运行（隐藏窗口，仅保留托盘与内核服务）"
-        >
-          <svg
-            class="brand-icon"
-            viewBox="0 0 24 24"
-            width="15"
-            height="15"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+          {autostartEnabled && (
+            <div class="bsm-item bsm-sub-item" onClick={handleToggleSilentAutostart}>
+              <div class="bsm-text">
+                <span class="bsm-title">静默自启</span>
+                <span class="bsm-sub">自启时隐藏窗口进托盘</span>
+              </div>
+              <span class={`bsm-switch${silentAutostart ? ' on' : ''}`} />
+            </div>
+          )}
+
+          <div class="bsm-divider" />
+
+          <button
+            class="bsm-action"
+            onClick={() => {
+              setShowSettings(false);
+              GuiApp.HideToTray();
+            }}
           >
-            <line x1="5" y1="12" x2="19" y2="12" />
+            <div class="bsm-text">
+              <span class="bsm-title">后台运行</span>
+              <span class="bsm-sub">关闭界面，仅留托盘与内核</span>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* ── 底部工具行：设置 | github tg docker | 检查更新 */}
+      <nav class="brand-links">
+        {/* 设置菜单按钮（含自启/静默/后台运行） */}
+        <button
+          class={`brand-autostart brand-settings-btn${showSettings ? ' open' : ''}${autostartEnabled ? ' active' : ''}`}
+          onClick={() => setShowSettings(v => !v)}
+          title="启动与后台选项"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
 
@@ -392,7 +434,7 @@ export function App() {
       {/* ── portConflict — 左右分栏布局（与 main/password 视图保持一致的窗口感）── */}
       {view === 'portConflict' && info && (
         <div class="page split-page">
-          <BrandPanel />
+          {renderBrandPanel()}
           <section class="login-panel">
             <PanelToolbar portInfo={null} />
             <div class="login-content login-content--conflict">
@@ -406,7 +448,7 @@ export function App() {
       {/* ── main — 左右分栏布局 ── */}
       {view === 'main' && info && (
         <div class="page split-page">
-          <BrandPanel />
+          {renderBrandPanel()}
           <section class="login-panel">
             <PanelToolbar portInfo={info} />
             <div class="login-content">
@@ -420,7 +462,7 @@ export function App() {
       {/* ── password — 左右分栏布局 ── */}
       {view === 'password' && (
         <div class="page split-page">
-          <BrandPanel />
+          {renderBrandPanel()}
           <section class="login-panel">
             <PanelToolbar portInfo={info} />
             <div class="login-content">

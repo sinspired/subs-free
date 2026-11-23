@@ -96,6 +96,13 @@ export function GetListenPort(): $CancellablePromise<string> {
 }
 
 /**
+ * GetSilentAutoStartEnabled 读取是否开启「静默自启」。
+ */
+export function GetSilentAutoStartEnabled(): $CancellablePromise<boolean> {
+    return $Call.ByID(3983477157);
+}
+
+/**
  * GetTrayWindowState 必须在主线程调用，返回真实窗口状态。
  */
 export function GetTrayWindowState(): $CancellablePromise<$models.TrayWindowState> {
@@ -198,14 +205,14 @@ export function QuitApp(): $CancellablePromise<void> {
 }
 
 /**
- * SetAutoStart 供前端 JS 绑定调用，切换开机自启。
+ * SetAutoStart 供前端 JS 绑定调用，切换开机自启（联动控制托盘「静默自启」子选项显隐）。
  */
 export function SetAutoStart(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(940964243, enabled);
 }
 
 /**
- * SetAutoStartEnabled 设置开机自启状态（供托盘菜单内部调用）。
+ * SetAutoStartEnabled 供托盘菜单内部调用，切换开机自启。
  */
 export function SetAutoStartEnabled(enable: boolean): $CancellablePromise<void> {
     return $Call.ByID(197427528, enable);
@@ -216,6 +223,13 @@ export function SetAutoStartEnabled(enable: boolean): $CancellablePromise<void> 
  */
 export function SetPorts(httpPort: string, subStorePort: string): $CancellablePromise<void> {
     return $Call.ByID(3443572318, httpPort, subStorePort);
+}
+
+/**
+ * SetSilentAutoStart 切换「静默自启」；若开机自启已开启，立即覆盖系统自启注册项。
+ */
+export function SetSilentAutoStart(silent: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1589259424, silent);
 }
 
 /**
