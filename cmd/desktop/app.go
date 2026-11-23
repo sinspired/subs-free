@@ -19,6 +19,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,13 @@ import (
 
 // globalGuiApp 包级指针，供 router handler（如 handleGuiBackToLogin）访问。
 var globalGuiApp *GuiApp
+
+// 默认为 true，因为启动时 webUIWin 初始 URL 为 about:blank
+var webUIUnloaded atomic.Bool
+
+func init() {
+	webUIUnloaded.Store(true)
+}
 
 // GuiApp Wails 绑定结构体。
 type GuiApp struct {
@@ -73,6 +81,10 @@ type GuiApp struct {
 	// 窗口，导致窗口状态混乱、事件监听器重复订阅，表现为"点两次图标更新
 	// 窗口就出问题""下载完成偶发不显示更新日志"等间歇性故障。
 	checkingUpdate atomic.Bool
+
+	webUIUnloadMu    sync.Mutex
+	webUIUnloadTimer *time.Timer
+	webUIUnloadGen   uint64
 }
 
 // AppInfo 前端展示所需的应用运行信息。
@@ -185,7 +197,10 @@ func (g *GuiApp) EnterWebUI() {
 	if g.webUIWin == nil || g.loginWin == nil {
 		return
 	}
+	g.cancelWebUIUnload()
 	g.inWebUI.Store(true)
+	webUIUnloaded.Store(false)
+
 	// 将当前 configPath 作为查询参数传入，保证切换配置后 admin 页面
 	// 读取到的是新配置文件的路径，而非启动时的旧路径。
 	adminURL := "/webui/admin.html?configPath=" + url.QueryEscape(g.configPath)
@@ -194,6 +209,7 @@ func (g *GuiApp) EnterWebUI() {
 	g.webUIWin.Center()
 	g.webUIWin.Focus()
 	g.loginWin.Hide()
+	windowVisible.Store(true)
 }
 
 // GetAPIKey 返回当前配置的 API Key，供本地 WebUI 页面通过 Wails binding 调用。
@@ -223,16 +239,60 @@ func (g *GuiApp) GetConfigPath() string {
 	return g.configPath
 }
 
-// BackToLogin 从 WebUI 返回登录窗口（可选功能，供托盘菜单使用）
+// BackToLogin 从 WebUI 返回登录窗口（供托盘菜单及切换配置使用）
 func (g *GuiApp) BackToLogin() {
 	if g.loginWin == nil {
 		return
 	}
+	g.cancelWebUIUnload()
 	g.inWebUI.Store(false)
-	g.loginWin.Show()
+
+	// 先隐藏并卸载 WebUI 页面，释放全部 WebView2/JS 内存，避免影响 windowVisible
+	if g.webUIWin != nil {
+		g.webUIWin.Hide()
+		g.webUIWin.EmitEvent("webui:visibility", false)
+		g.webUIWin.SetURL("about:blank")
+		webUIUnloaded.Store(true)
+	}
+
+	showWindow(g.loginWin)
 	g.loginWin.Center()
-	g.loginWin.Focus()
-	g.webUIWin.Hide()
+}
+
+// cancelWebUIUnload 取消待执行的闲置卸载任务。
+func (g *GuiApp) cancelWebUIUnload() {
+	g.webUIUnloadMu.Lock()
+	g.webUIUnloadGen++
+	if g.webUIUnloadTimer != nil {
+		g.webUIUnloadTimer.Stop()
+		g.webUIUnloadTimer = nil
+	}
+	g.webUIUnloadMu.Unlock()
+}
+
+// scheduleWebUIUnload 在窗口隐藏一段时间后重置为 about:blank，彻底回收 WebView2 内存。
+// （注：若用户有未保存的表单修改且希望保留更久，可将 5*time.Minute 调大）
+func (g *GuiApp) scheduleWebUIUnload() {
+	g.webUIUnloadMu.Lock()
+	g.webUIUnloadGen++
+	gen := g.webUIUnloadGen
+	if g.webUIUnloadTimer != nil {
+		g.webUIUnloadTimer.Stop()
+	}
+	g.webUIUnloadTimer = time.AfterFunc(5*time.Minute, func() {
+		application.InvokeAsync(func() {
+			g.webUIUnloadMu.Lock()
+			stale := g.webUIUnloadGen != gen
+			g.webUIUnloadMu.Unlock()
+			if stale || g.webUIWin == nil || g.webUIWin.IsVisible() || webUIUnloaded.Load() {
+				return
+			}
+			g.webUIWin.SetURL("about:blank")
+			webUIUnloaded.Store(true)
+			slog.Debug("管理界面长期隐藏，已重置为 about:blank 释放 WebView2 内存")
+		})
+	})
+	g.webUIUnloadMu.Unlock()
 }
 
 // GetAppInfo 返回应用运行信息（含端口冲突检测）。
@@ -509,6 +569,12 @@ func (g *GuiApp) OpenConfigFile() (string, error) {
 func (g *GuiApp) showActiveWindow() {
 	if g.inWebUI.Load() {
 		if g.webUIWin != nil {
+			// 若此前因长期隐藏被卸载到 about:blank，直接重新进入管理页
+			if webUIUnloaded.Load() {
+				g.EnterWebUI()
+				return
+			}
+			g.cancelWebUIUnload()
 			showWindow(g.webUIWin)
 		}
 	} else {

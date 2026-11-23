@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	guiupdater "github.com/sinspired/subs-free/updater"
@@ -56,6 +57,10 @@ func main() {
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
+		},
+		Windows: application.WindowsOptions{
+			DisableQuitOnLastWindowClosed: true,
+			UseVisualHosting:              true, // 修复 Windows WebView2 隐藏/跨DPI/RDP 渲染表面问题
 		},
 
 		// 第二次启动时：唤醒第一实例
@@ -169,6 +174,37 @@ func main() {
 		loginWin.EmitEvent("window:close-requested", nil)
 	})
 
+	// 用于在长期隐藏时释放 WebView2 内存（需配合 app.go 中的 webUIUnloaded 标记）
+	var (
+		webUIUnloadMu    sync.Mutex
+		webUIUnloadTimer *time.Timer
+	)
+	cancelWebUIUnload := func() {
+		webUIUnloadMu.Lock()
+		if webUIUnloadTimer != nil {
+			webUIUnloadTimer.Stop()
+			webUIUnloadTimer = nil
+		}
+		webUIUnloadMu.Unlock()
+	}
+	scheduleWebUIUnload := func() {
+		webUIUnloadMu.Lock()
+		if webUIUnloadTimer != nil {
+			webUIUnloadTimer.Stop()
+		}
+		// 隐藏超过 2 分钟仍未打开，重置为 about:blank 彻底释放 WebView2 内存
+		webUIUnloadTimer = time.AfterFunc(2*time.Minute, func() {
+			application.InvokeAsync(func() {
+				if !webUIWin.IsVisible() {
+					webUIWin.SetURL("about:blank")
+					webUIUnloaded.Store(true)
+					slog.Debug("管理界面长期隐藏，已重置为 about:blank 释放内存")
+				}
+			})
+		})
+		webUIUnloadMu.Unlock()
+	}
+
 	webUIWin.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		hideWindow(webUIWin)
 		e.Cancel()
@@ -179,9 +215,26 @@ func main() {
 	})
 
 	webUIWin.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
-		webUIWin.Hide()
-		windowVisible.Store(false)
+		hideWindow(webUIWin)
 		sendOSNotification("Subs Check PRO", "管理界面已最小化到系统托盘")
+	})
+
+	// 利用 Wails v3 原生可见性事件驱动前端启停轮询 + 闲置释放
+	webUIWin.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
+		webUIWin.EmitEvent("webui:visibility", false)
+		scheduleWebUIUnload()
+	})
+	webUIWin.OnWindowEvent(events.Common.WindowShow, func(e *application.WindowEvent) {
+		cancelWebUIUnload()
+		webUIWin.EmitEvent("webui:visibility", true)
+	})
+	webUIWin.OnWindowEvent(events.Common.WindowUnMinimise, func(e *application.WindowEvent) {
+		cancelWebUIUnload()
+		webUIWin.EmitEvent("webui:visibility", true)
+	})
+	webUIWin.OnWindowEvent(events.Common.WindowRestore, func(e *application.WindowEvent) {
+		cancelWebUIUnload()
+		webUIWin.EmitEvent("webui:visibility", true)
 	})
 
 	loginWin.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {

@@ -19,7 +19,7 @@ import * as updater$0 from "../../updater/models.js";
 import * as $models from "./models.js";
 
 /**
- * BackToLogin 从 WebUI 返回登录窗口（可选功能，供托盘菜单使用）
+ * BackToLogin 从 WebUI 返回登录窗口（供托盘菜单及切换配置使用）
  */
 export function BackToLogin(): $CancellablePromise<void> {
     return $Call.ByID(2210097929);

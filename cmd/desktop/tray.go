@@ -295,17 +295,31 @@ func buildTrayMenu(
 		onQuit()
 	})
 
-	// 初始化 Notch Window (macOS 灵动岛通知)
-	notchWin := wailsApp.Window.NewNotchWindow(application.NotchWindowOptions{
-		Width:    260,
-		Height:   46, // 保持细长，贴合物理摄像头模组
-		Animated: true,
-		WindowOptions: application.WebviewWindowOptions{
-			Name:           "notch_progress",
-			URL:            "/notch.html",
-			BackgroundType: application.BackgroundTypeTransparent,
-		},
-	})
+	// 初始化 Notch Window (仅 macOS 生效，避免 Windows 额外创建一个常驻 WebView2 进程)
+	showNotch := func() {}
+	hideNotch := func() {}
+	if runtime.GOOS == "darwin" {
+		notchWin := wailsApp.Window.NewNotchWindow(application.NotchWindowOptions{
+			Width:    260,
+			Height:   46, // 保持细长，贴合物理摄像头模组
+			Animated: true,
+			WindowOptions: application.WebviewWindowOptions{
+				Name:           "notch_progress",
+				URL:            "/notch.html",
+				BackgroundType: application.BackgroundTypeTransparent,
+			},
+		})
+		showNotch = func() {
+			application.InvokeAsync(func() {
+				notchWin.Show()
+			})
+		}
+		hideNotch = func() {
+			application.InvokeAsync(func() {
+				notchWin.Hide()
+			})
+		}
+	}
 
 	var isNotchVisible atomic.Bool
 
@@ -337,7 +351,7 @@ func buildTrayMenu(
 				if !isNotchVisible.Load() {
 					isNotchVisible.Store(true) // 立即锁定状态，防止重复调用
 					application.InvokeAsync(func() {
-						notchWin.Show()
+						showNotch()
 					})
 				}
 				stopCheckMenu.SetEnabled(true)
@@ -358,7 +372,7 @@ func buildTrayMenu(
 					// 4秒后，双重确认用户没有在这4秒内再次点击“开始检测”
 					if !coreApp.IsChecking() {
 						application.InvokeAsync(func() {
-							notchWin.Hide()
+							hideNotch()
 						})
 					}
 				})
@@ -449,12 +463,18 @@ func showWindow(win *application.WebviewWindow) {
 	win.Show()
 	win.Focus()
 	windowVisible.Store(true)
+	if win.Name() == "webui" {
+		win.EmitEvent("webui:visibility", true)
+	}
 	slog.Debug("窗口已显示")
 }
 
 func hideWindow(win *application.WebviewWindow) {
 	win.Hide()
 	windowVisible.Store(false)
+	if win.Name() == "webui" {
+		win.EmitEvent("webui:visibility", false)
+	}
 	slog.Debug("窗口已隐藏到托盘")
 }
 
