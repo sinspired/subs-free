@@ -46,6 +46,9 @@ interface CheckState {
   progress: number;
   proxyCount: number;
   lastResult: string;
+  nextCheckTime?: string;
+  nextCheckUnix?: number;
+  scheduleMode?: string;
 }
 
 interface LastStats {
@@ -1090,10 +1093,16 @@ export function App() {
                     <div class="stat-item"><span class="val">{lastStats.duration}</span><span class="lbl">检测耗时</span></div>
                     <div class="stat-item"><span class="val">{lastStats.traffic}</span><span class="lbl">消耗流量</span></div>
                   </div>
-                  <div class="status-text muted status-footer" >最后检测于: {lastStats.time}</div>
+                  <div class="status-text muted status-footer">
+                    最后检测于: {lastStats.time}
+                    {status?.nextCheckTime ? ` · 下次检测: ${status.nextCheckTime}` : ""}
+                  </div>
                 </Fragment>
               ) : (
-                <div class="status-text muted">{status?.lastResult || "尚无检测记录，一切准备就绪。"}</div>
+                <div class="status-text muted">
+                  {status?.lastResult || "准备就绪"}
+                  {status?.nextCheckTime ? `，定时任务将于 ${status.nextCheckTime} 触发` : ""}
+                </div>
               )
             )}
           </div>

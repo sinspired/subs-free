@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	coreapp "github.com/sinspired/subs-check-pro/v3/app"
@@ -63,12 +64,15 @@ type AppInfo struct {
 }
 
 type CheckState struct {
-	IsChecking bool   `json:"isChecking"`
-	StepName   string `json:"stepName"`
-	Available  int64  `json:"available"`
-	Progress   int64  `json:"progress"`
-	ProxyCount int64  `json:"proxyCount"`
-	LastResult string `json:"lastResult"`
+	IsChecking    bool   `json:"isChecking"`
+	StepName      string `json:"stepName"`
+	Available     int64  `json:"available"`
+	Progress      int64  `json:"progress"`
+	ProxyCount    int64  `json:"proxyCount"`
+	LastResult    string `json:"lastResult"`
+	NextCheckTime string `json:"nextCheckTime"` // 友好文本，如 "今天 16:30" / "明天 04:00" / "11-26 04:00"
+	NextCheckUnix int64  `json:"nextCheckUnix"` // Unix 秒级时间戳（0 表示未计划）
+	ScheduleMode  string `json:"scheduleMode"`  // "cron" | "interval" | ""
 }
 
 type PublicInfo struct {
@@ -142,18 +146,48 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 	}
 }
 
+func formatNextCheckLabel(t time.Time) string {
+	local := t.Local()
+	now := time.Now().Local()
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	targetDay := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+	diffDays := int(targetDay.Sub(today).Hours() / 24)
+
+	switch diffDays {
+	case 0:
+		return "今天 " + local.Format("15:04")
+	case 1:
+		return "明天 " + local.Format("15:04")
+	default:
+		return local.Format("01-02 15:04")
+	}
+}
+
 func (g *GuiApp) GetCheckState() CheckState {
 	if !g.backendReady || g.backend == nil {
 		return CheckState{IsChecking: false, StepName: "内核未就绪"}
 	}
 	st := g.backend.GetCurrentState()
+	nextTime, mode := g.backend.GetNextCheckTime()
+
+	var nextStr string
+	var nextUnix int64
+	if !nextTime.IsZero() {
+		nextUnix = nextTime.Unix()
+		nextStr = formatNextCheckLabel(nextTime)
+	}
+
 	return CheckState{
-		IsChecking: g.backend.IsChecking(),
-		StepName:   st.StepName,
-		Available:  st.Available,
-		Progress:   st.Progress,
-		ProxyCount: st.ProxyCount,
-		LastResult: g.backend.GetLastCheckResult(),
+		IsChecking:    g.backend.IsChecking(),
+		StepName:      st.StepName,
+		Available:     st.Available,
+		Progress:      st.Progress,
+		ProxyCount:    st.ProxyCount,
+		LastResult:    g.backend.GetLastCheckResult(),
+		NextCheckTime: nextStr,
+		NextCheckUnix: nextUnix,
+		ScheduleMode:  mode,
 	}
 }
 

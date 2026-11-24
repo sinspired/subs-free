@@ -32,6 +32,21 @@ export interface CheckState {
     "progress": number;
     "proxyCount": number;
     "lastResult": string;
+
+    /**
+     * 友好文本，如 "今天 16:30" / "明天 04:00" / "11-26 04:00"
+     */
+    "nextCheckTime": string;
+
+    /**
+     * Unix 秒级时间戳（0 表示未计划）
+     */
+    "nextCheckUnix": number;
+
+    /**
+     * "cron" | "interval" | ""
+     */
+    "scheduleMode": string;
 }
 
 export interface PublicInfo {
