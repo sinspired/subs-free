@@ -981,13 +981,18 @@ export function App() {
         >
           <div class="quit-dialog desk-log-dialog">
             <div class="upd-header desk-log-header">
-              <div>
+              <div class="desk-log-title-wrap">
                 <span class="upd-title">实时日志</span>
-                <span class="upd-desc" style="margin-left:8px;">最近 {logLines.length} 行</span>
+                <span class={`desk-log-state${logPaused ? ' is-paused' : !logAutoFollow ? '' : ' is-live'}`}>
+                  <span class="desk-log-state-dot" />
+                  {logPaused ? '已暂停' : !logAutoFollow ? '浏览中' : '实时'}
+                </span>
+                <span class="desk-log-count">{logLines.length} 行</span>
               </div>
+
               <div class="desk-log-actions">
                 <button
-                  class={`icon-btn upd-eye-btn${logPaused ? ' is-paused' : ''}`}
+                  class={`icon-btn desk-log-btn${logPaused ? ' is-paused' : ''}`}
                   onClick={() => {
                     const next = !logPaused;
                     setLogPaused(next);
@@ -998,11 +1003,16 @@ export function App() {
                 >
                   {logPaused ? '继续' : '暂停'}
                 </button>
-                <button class="icon-btn upd-eye-btn" onClick={() => fetchLogsOnce(true)} title="立即刷新">
+                <button
+                  class="icon-btn desk-log-btn"
+                  onClick={() => fetchLogsOnce(true)}
+                  title="立即刷新"
+                >
                   刷新
                 </button>
                 <button
-                  class="icon-btn upd-eye-btn"
+                  class="icon-btn desk-log-btn"
+                  disabled={logLines.length === 0}
                   onClick={async () => {
                     await GuiApp.APIProxy('POST', '/api/logs/clear', '');
                     pendingLogsRef.current = null;
@@ -1015,7 +1025,8 @@ export function App() {
                   清空
                 </button>
                 <button
-                  class="icon-btn upd-eye-btn"
+                  class="icon-btn desk-log-btn"
+                  disabled={logLines.length === 0}
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(logLines.join('\n'));
@@ -1024,10 +1035,22 @@ export function App() {
                       toast('复制失败');
                     }
                   }}
+                  title="复制当前显示日志"
                 >
                   复制
                 </button>
-                <button class="icon-btn upd-eye-btn" onClick={() => setShowLogModal(false)}>关闭</button>
+                <span class="desk-log-sep" />
+                <button
+                  class="icon-btn desk-log-close"
+                  onClick={() => setShowLogModal(false)}
+                  title="关闭 (Esc)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
             </div>
 

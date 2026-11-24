@@ -2354,8 +2354,8 @@ code {
 
 /* 快捷实时日志弹窗 */
 .desk-log-dialog {
-  width: min(560px, calc(100vw - 32px));
-  height: min(410px, calc(100vh - 44px));
+  width: min(580px, calc(100vw - 28px));
+  height: min(420px, calc(100vh - 36px));
   display: flex;
   flex-direction: column;
 }
@@ -2364,51 +2364,193 @@ code {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+}
+
+.desk-log-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.desk-log-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--muted);
+  background: var(--code-bg);
+}
+
+.desk-log-state.is-live {
+  color: var(--accent);
+  background: var(--info-bg);
+}
+
+.desk-log-state.is-paused {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.desk-log-state-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.desk-log-state.is-live .desk-log-state-dot {
+  animation: upd-badge-pulse 1.8s ease-in-out infinite;
+}
+
+.desk-log-count {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 .desk-log-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.desk-log-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.desk-log-btn:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--code-bg);
+}
+
+.desk-log-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.desk-log-btn.is-paused {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.desk-log-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+  margin: 0 3px;
+}
+
+.desk-log-close {
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.desk-log-close:hover {
+  color: var(--fg);
+  background: var(--code-bg);
+}
+
+.desk-log-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
 }
 
 .desk-log-body {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 14px;
+  overflow-x: hidden;
+  padding: 8px 8px 16px 10px;
   font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 11px;
-  line-height: 1.55;
+  line-height: 1.6;
   background: var(--bg);
   user-select: text;
   -webkit-user-select: text;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 28%, transparent) transparent;
+}
+
+/* 日志区细圆角滚动条（WebView2 / Chromium） */
+.desk-log-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.desk-log-body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.desk-log-body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 26%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background 0.15s;
+}
+
+.desk-log-body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 48%, transparent);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.desk-log-body::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--accent) 65%, transparent);
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 .desk-log-line {
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--fg);
-  line-height: 1.6;
-  padding: 2px 0;
+  padding: 2px 6px;
+  border-radius: 5px;
+  transition: background 0.1s ease;
+}
+
+.desk-log-line:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
 }
 
 .desk-log-time {
+  font-size: 10.5px;
   color: var(--muted);
   opacity: 0.55;
-  margin-right: 6px;
+  margin-right: 7px;
   font-variant-numeric: tabular-nums;
 }
 
 .desk-log-lvl {
   display: inline-block;
-  font-size: 10px;
+  min-width: 32px;
+  text-align: center;
+  font-size: 9.5px;
   font-weight: 600;
-  line-height: 1.4;
-  padding: 0 5px;
+  line-height: 1.45;
+  padding: 0 4px;
   border-radius: 4px;
-  margin-right: 6px;
-  letter-spacing: 0.02em;
+  margin-right: 7px;
+  letter-spacing: 0.03em;
 }
 
 .desk-log-lvl.is-info {
@@ -2432,11 +2574,12 @@ code {
 }
 
 .desk-log-msg {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .desk-log-key {
   color: var(--muted);
+  opacity: 0.85;
 }
 
 .desk-log-url {
@@ -2446,31 +2589,37 @@ code {
   text-underline-offset: 2px;
 }
 
-.desk-log-wrap {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+.desk-log-empty {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  opacity: 0.65;
 }
 
 .desk-log-jump-btn {
   position: absolute;
-  right: 14px;
-  bottom: 12px;
+  right: 16px;
+  bottom: 14px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 11px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--card);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--fg);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
   transition:
     border-color 0.15s,
     color 0.15s,
@@ -2493,8 +2642,5 @@ code {
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
-}
-
-.upd-eye-btn.is-paused {
-  color: var(--warn);
+  animation: upd-badge-pulse 1.6s ease-in-out infinite;
 }
