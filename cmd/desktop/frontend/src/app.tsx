@@ -166,6 +166,20 @@ export function App() {
   const [logLines, setLogLines] = useState<string[]>([]);
   const logBodyRef = useRef<HTMLDivElement>(null);
 
+  const [logAutoFollow, setLogAutoFollow] = useState(true);
+  const [logPaused, setLogPaused] = useState(false);
+  const [hasNewLogs, setHasNewLogs] = useState(false);
+
+  const logLinesRef = useRef<string[]>([]); // ← 补上这一行
+  const logAutoFollowRef = useRef(true);
+  const logPausedRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
+  const pendingLogsRef = useRef<string[] | null>(null);
+
+  logLinesRef.current = logLines;
+  logAutoFollowRef.current = logAutoFollow;
+  logPausedRef.current = logPaused;
+
   async function syncUpdaterSettings() {
     try {
       const s = await GuiApp.GetUpdaterSettings();
@@ -214,7 +228,7 @@ export function App() {
     } catch { /* 忽略 */ }
   }
 
-  async function fetchLogsOnce() {
+  async function fetchLogsOnce(forceApply = false) {
     try {
       const raw = await GuiApp.APIProxy('GET', '/api/logs', '');
       const res = JSON.parse(raw) as { status: number; body: string };
@@ -225,11 +239,76 @@ export function App() {
         : typeof parsed?.logs === 'string'
           ? parsed.logs.split('\n')
           : [];
-      const cleaned = lines
+      const next = lines
         .map(l => l.replace(LOG_ANSI_RE, ''))
-        .filter(l => l.trim() !== '' && !LOG_NOISE_RE.test(l));
-      setLogLines(cleaned.slice(-150));
+        .filter(l => l.trim() !== '' && !LOG_NOISE_RE.test(l))
+        .slice(-150);
+
+      // 内容无变化时直接跳过，避免无意义重渲染
+      const cur = logLinesRef.current;
+      const isSame = cur.length === next.length && cur.every((v, i) => v === next[i]);
+      if (isSame) return;
+
+      // 用户正在日志区划词选中文本时，暂缓刷新列表
+      const sel = window.getSelection();
+      const isSelectingInLogs =
+        !!sel &&
+        !sel.isCollapsed &&
+        !!logBodyRef.current &&
+        logBodyRef.current.contains(sel.anchorNode);
+
+      if (!forceApply && (!logAutoFollowRef.current || logPausedRef.current || isSelectingInLogs)) {
+        pendingLogsRef.current = next;
+        setHasNewLogs(true);
+        return;
+      }
+
+      pendingLogsRef.current = null;
+      setHasNewLogs(false);
+      setLogLines(next);
     } catch { /* 忽略 */ }
+  }
+
+  function scrollToLogBottom() {
+    if (pendingLogsRef.current) {
+      setLogLines(pendingLogsRef.current);
+      pendingLogsRef.current = null;
+    }
+    setHasNewLogs(false);
+    setLogPaused(false);
+    setLogAutoFollow(true);
+    logPausedRef.current = false;
+    logAutoFollowRef.current = true;
+
+    requestAnimationFrame(() => {
+      const el = logBodyRef.current;
+      if (!el) return;
+      isAutoScrollingRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        isAutoScrollingRef.current = false;
+      });
+    });
+  }
+
+  function handleLogScroll() {
+    const el = logBodyRef.current;
+    if (!el || isAutoScrollingRef.current) return;
+
+    // 留 24px 容差，兼容 Windows 125%/150% 缩放下的小数像素偏差
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 24;
+    if (atBottom && !logAutoFollowRef.current) {
+      setLogAutoFollow(true);
+      logAutoFollowRef.current = true;
+      if (pendingLogsRef.current) {
+        setLogLines(pendingLogsRef.current);
+        pendingLogsRef.current = null;
+        setHasNewLogs(false);
+      }
+    } else if (!atBottom && logAutoFollowRef.current) {
+      setLogAutoFollow(false);
+      logAutoFollowRef.current = false;
+    }
   }
 
   // ── Wails 就绪后立即拉取应用信息与偏好设置 ─────────────────────
@@ -362,17 +441,30 @@ export function App() {
   // ── 快捷日志弹窗打开时才轮询日志，关闭即销毁定时器 ────────────
   useEffect(() => {
     if (!showLogModal) return;
-    fetchLogsOnce();
+    setLogAutoFollow(true);
+    setLogPaused(false);
+    setHasNewLogs(false);
+    pendingLogsRef.current = null;
+    logAutoFollowRef.current = true;
+    logPausedRef.current = false;
+
+    fetchLogsOnce(true);
     const timer = window.setInterval(() => {
-      if (!document.hidden) fetchLogsOnce();
+      if (!document.hidden && !logPausedRef.current) {
+        fetchLogsOnce();
+      }
     }, 1500);
     return () => window.clearInterval(timer);
   }, [showLogModal]);
 
   useEffect(() => {
-    if (showLogModal && logBodyRef.current) {
-      logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
-    }
+    if (!showLogModal || !logAutoFollowRef.current || !logBodyRef.current) return;
+    const el = logBodyRef.current;
+    isAutoScrollingRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      isAutoScrollingRef.current = false;
+    });
   }, [logLines, showLogModal]);
 
   // ── 点击外部或按 Esc 自动关闭设置菜单 / 弹窗 ──────────────────
@@ -894,11 +986,27 @@ export function App() {
                 <span class="upd-desc" style="margin-left:8px;">最近 {logLines.length} 行</span>
               </div>
               <div class="desk-log-actions">
-                <button class="icon-btn upd-eye-btn" onClick={fetchLogsOnce} title="立即刷新">刷新</button>
+                <button
+                  class={`icon-btn upd-eye-btn${logPaused ? ' is-paused' : ''}`}
+                  onClick={() => {
+                    const next = !logPaused;
+                    setLogPaused(next);
+                    logPausedRef.current = next;
+                    if (!next) fetchLogsOnce(logAutoFollowRef.current);
+                  }}
+                  title={logPaused ? '恢复自动刷新' : '暂停自动刷新'}
+                >
+                  {logPaused ? '继续' : '暂停'}
+                </button>
+                <button class="icon-btn upd-eye-btn" onClick={() => fetchLogsOnce(true)} title="立即刷新">
+                  刷新
+                </button>
                 <button
                   class="icon-btn upd-eye-btn"
                   onClick={async () => {
                     await GuiApp.APIProxy('POST', '/api/logs/clear', '');
+                    pendingLogsRef.current = null;
+                    setHasNewLogs(false);
                     setLogLines([]);
                     toast('日志已清空');
                   }}
@@ -923,32 +1031,46 @@ export function App() {
               </div>
             </div>
 
-            <div class="desk-log-body" ref={logBodyRef}>
-              {logLines.length === 0 ? (
-                <div class="desk-log-empty">暂无日志记录</div>
-              ) : (
-                logLines.map((line, idx) => {
-                  const item = parseLogLine(line);
-                  return (
-                    <div key={idx} class="desk-log-line">
-                      {item.time && <span class="desk-log-time">{item.time}</span>}
-                      {item.level && (
-                        <span class={`desk-log-lvl is-${item.levelKind}`}>{item.level}</span>
-                      )}
-                      <span class="desk-log-msg">
-                        {item.tokens.map((tok, ti) =>
-                          tok.type === 'url' ? (
-                            <span key={ti} class="desk-log-url">{tok.value}</span>
-                          ) : tok.type === 'key' ? (
-                            <span key={ti} class="desk-log-key">{tok.value}</span>
-                          ) : (
-                            tok.value
-                          )
+            <div class="desk-log-wrap">
+              <div class="desk-log-body" ref={logBodyRef} onScroll={handleLogScroll}>
+                {logLines.length === 0 ? (
+                  <div class="desk-log-empty">暂无日志记录</div>
+                ) : (
+                  logLines.map((line, idx) => {
+                    const item = parseLogLine(line);
+                    return (
+                      <div key={idx} class="desk-log-line">
+                        {item.time && <span class="desk-log-time">{item.time}</span>}
+                        {item.level && (
+                          <span class={`desk-log-lvl is-${item.levelKind}`}>{item.level}</span>
                         )}
-                      </span>
-                    </div>
-                  );
-                })
+                        <span class="desk-log-msg">
+                          {item.tokens.map((tok, ti) =>
+                            tok.type === 'url' ? (
+                              <span key={ti} class="desk-log-url">{tok.value}</span>
+                            ) : tok.type === 'key' ? (
+                              <span key={ti} class="desk-log-key">{tok.value}</span>
+                            ) : (
+                              tok.value
+                            )
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {!logAutoFollow && (
+                <button
+                  type="button"
+                  class={`desk-log-jump-btn${hasNewLogs ? ' has-new' : ''}`}
+                  onClick={scrollToLogBottom}
+                  title="跳到最新日志并恢复自动跟随"
+                >
+                  {hasNewLogs && <span class="desk-log-new-dot" />}
+                  <span>{hasNewLogs ? '有新日志 ↓' : '回到底部 ↓'}</span>
+                </button>
               )}
             </div>
           </div>
