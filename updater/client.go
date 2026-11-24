@@ -129,6 +129,7 @@ func dohLookup(ctx context.Context, host string) []string {
 			return ips
 		}
 	}
+	slog.Debug("DoH 解析失败，回退系统 DNS", "host", host)
 	return nil
 }
 
@@ -284,8 +285,7 @@ func (t *proxyTransport) proxyURL(original *url.URL) *url.URL {
 
 // resolveGhProxyBase 把 GhProxyBase 并入 config.GlobalConfig.GithubProxyGroup
 // （去重后追加），交给 utils.GetGhProxy() 做并发测速+打分，选出当前实际
-// 可用且最快的一个。选不出可用节点时兜底回退到 GhProxyBase 本身，保证
-// 至少有一个地址可用（即便它当下也慢）。
+// 可用且最快的一个。选不出可用节点时兜底回退到 GhProxyBase 本身。
 func resolveGhProxyBase() string {
 	base := config.GlobalConfig.GithubProxyGroup
 	found := false
@@ -308,8 +308,46 @@ func resolveGhProxyBase() string {
 		}
 	}
 
-	slog.Warn("GitHub 代理测速未选出可用节点，回退到默认地址", "proxy", GhProxyBase)
+	slog.Warn("GitHub 代理测速无可用节点，回退默认地址", "proxy", GhProxyBase)
 	return GhProxyBase
+}
+
+// resolveSysProxyFunc 优先使用环境变量代理（ProxyFromEnvironment）；
+// 若未命中，则回退显式解析 config.GlobalConfig.SystemProxy。
+func resolveSysProxyFunc() (func(*http.Request) (*url.URL, error), string, string) {
+	cfgRaw := strings.TrimSpace(config.GlobalConfig.SystemProxy)
+	var cfgURL *url.URL
+	if cfgRaw != "" {
+		raw := cfgRaw
+		if !strings.Contains(raw, "://") {
+			raw = "http://" + raw
+		}
+		if u, err := url.Parse(raw); err == nil && u.Host != "" {
+			cfgURL = u
+		} else {
+			slog.Warn("系统代理配置格式无效，已忽略", "proxy", cfgRaw, "error", err)
+		}
+	}
+
+	probeReq, _ := http.NewRequest(http.MethodGet, "https://github.com", nil)
+	if envURL, err := http.ProxyFromEnvironment(probeReq); err == nil && envURL != nil {
+		proxyFn := func(req *http.Request) (*url.URL, error) {
+			if u, e := http.ProxyFromEnvironment(req); e == nil && u != nil {
+				return u, nil
+			}
+			if cfgURL != nil {
+				return cfgURL, nil
+			}
+			return nil, nil
+		}
+		return proxyFn, "env", envURL.Redacted()
+	}
+
+	if cfgURL != nil {
+		return http.ProxyURL(cfgURL), "config", cfgURL.Redacted()
+	}
+
+	return nil, "none", "none"
 }
 
 // speedGuardReader 包裹响应体，按滚动窗口持续统计下载速度；经过
@@ -426,12 +464,20 @@ func (t *speedGuardTransport) RoundTrip(req *http.Request) (*http.Response, erro
 // speedGuardTransport 只负责"明显过慢时提前失败"，不替代整体超时控制。
 func NewHTTPClient() *http.Client {
 	ghProxyBase := resolveGhProxyBase()
-	sysProxyOK := utils.GetSysProxy()
-
 	GhProxyResolved = ghProxyBase
 
+	_ = utils.GetSysProxy()
+	proxyFn, proxySource, proxyDisplay := resolveSysProxyFunc()
+	sysProxyOK := proxyFn != nil
+
+	slog.Info("更新网络已就绪",
+		"sysProxy", proxyDisplay,
+		"proxySource", proxySource,
+		"ghProxy", ghProxyBase,
+	)
+
 	ghBase := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
+		Proxy:                 nil, // 兜底层明确不经系统代理，直接走 DoH + uTLS
 		DialContext:           dohDialContext,
 		DialTLSContext:        dohDialTLSContext,
 		ForceAttemptHTTP2:     false,
@@ -442,14 +488,14 @@ func NewHTTPClient() *http.Client {
 
 	ft := &fallbackTransport{
 		sysProxyAvailable: sysProxyOK,
-		ghProxy:           newProxyTransport(ghBase, ghProxyBase), // 兜底层：不经系统代理
+		ghProxy:           newProxyTransport(ghBase, ghProxyBase),
 	}
 	if sysProxyOK {
-		ft.sysProxyDirect = newSysProxyBaseTransport() // 第 1 层：系统代理 + 原始地址
+		ft.sysProxyDirect = newSysProxyBaseTransport(proxyFn)
 	}
 
 	return &http.Client{
 		Transport: &speedGuardTransport{base: ft},
-		Timeout:   0, // 整体耗时上限由调用方通过 context 控制，见函数注释
+		Timeout:   0,
 	}
 }

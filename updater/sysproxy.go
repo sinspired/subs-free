@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -20,9 +21,12 @@ const sysProxyAttemptTimeout = 8 * time.Second
 // utils.GetSysProxy() 已设置好的 HTTP_PROXY/HTTPS_PROXY）转发请求。流量已
 // 交给本地代理软件处理，DNS 污染、TLS 指纹限速都是代理软件自己要解决的
 // 问题，这里不做额外伪装。
-func newSysProxyBaseTransport() *http.Transport {
+func newSysProxyBaseTransport(proxyFn func(*http.Request) (*url.URL, error)) *http.Transport {
+	if proxyFn == nil {
+		proxyFn = http.ProxyFromEnvironment
+	}
 	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: proxyFn,
 		DialContext: (&net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 60 * time.Second,
@@ -55,12 +59,15 @@ type fallbackTransport struct {
 
 func (t *fallbackTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.sysProxyAvailable {
-		if resp, err := t.tryWithTimeout(t.sysProxyDirect, req, sysProxyAttemptTimeout); err == nil {
+		resp, err := t.tryWithTimeout(t.sysProxyDirect, req, sysProxyAttemptTimeout)
+		if err == nil {
 			return resp, nil
-		} else {
-			slog.Warn("系统代理连接 GitHub 失败，切换直连线路",
-				"url", req.URL.String(), "error", err)
 		}
+		slog.Warn("系统代理请求失败，切换 DoH+反代兜底",
+			"host", req.URL.Host,
+			"path", req.URL.Path,
+			"error", err,
+		)
 	}
 
 	return t.ghProxy.RoundTrip(req)
@@ -90,6 +97,8 @@ func (t *fallbackTransport) RoundTrip(req *http.Request) (*http.Response, error)
 func (t *fallbackTransport) tryWithTimeout(rt http.RoundTripper, req *http.Request, timeout time.Duration) (*http.Response, error) {
 	ctx, cancel := context.WithCancel(req.Context())
 	r := req.Clone(ctx)
+	withBrowserHeaders(r) // 必须在 RoundTrip 之前注入 UA 和 GitHub Token
+
 
 	// 定时器只代表"探测阶段超时"：timeout 秒内还没拿到响应头，就认定这条
 	// 线路不可用，主动 cancel 交给下一层 fallback；一旦 RoundTrip 返回就
@@ -102,7 +111,6 @@ func (t *fallbackTransport) tryWithTimeout(rt http.RoundTripper, req *http.Reque
 		cancel()
 		return nil, err
 	}
-	withBrowserHeaders(r)
 	resp.Body = newCancelOnCloseReader(resp.Body, cancel)
 	return resp, nil
 }
