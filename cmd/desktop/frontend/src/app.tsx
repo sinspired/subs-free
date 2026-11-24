@@ -857,7 +857,7 @@ function MainApp() {
         {/* 社交链接 */}
         <a
           class="brand-link"
-          onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro')}
+          onClick={() => openLink('https://github.com/sinspired/subs-check-pro')}
           title="GitHub 仓库，欢迎 Star 和提 Issue"
         >
           <img src="/github.svg" alt="GitHub" class="brand-social-icon" />

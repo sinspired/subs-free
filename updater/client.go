@@ -22,7 +22,7 @@ import (
 // GhProxyBase 是本项目自建的 CF-Proxy Worker 中转地址，作为 GithubProxyGroup
 // 的固定候选之一参与测速打分，不再单独硬编码使用——最终使用哪个由
 // utils.GetGhProxy() 的并发测速结果决定（见 resolveGhProxyBase）。
-const GhProxyBase = "https://proxy.linkpc.dpdns.org/"
+const GhProxyBase = "https://gh-proxy.org/"
 
 var GhProxyResolved = GhProxyBase
 
