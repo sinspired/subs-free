@@ -205,6 +205,13 @@ export function OpenInternalPage(path: string, title: string, windowSize: string
 }
 
 /**
+ * OpenLogsWindow 打开或聚焦「实时日志」独立窗口（单例模式）。
+ */
+export function OpenLogsWindow(): $CancellablePromise<void> {
+    return $Call.ByID(895416309);
+}
+
+/**
  * OpenSubLinksWindow 打开或聚焦「订阅链接」独立窗口（单例模式）。
  */
 export function OpenSubLinksWindow(): $CancellablePromise<void> {

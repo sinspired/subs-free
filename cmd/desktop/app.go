@@ -62,6 +62,7 @@ type GuiApp struct {
 	subStoreWin *application.WebviewWindow
 	filesWin    *application.WebviewWindow
 	analysisWin *application.WebviewWindow
+	logsWin     *application.WebviewWindow
 
 	// updateWin 自定义更新窗口（懒加载，复用）。
 	updateWin       *application.WebviewWindow
@@ -720,6 +721,9 @@ func (g *GuiApp) HideToTray() {
 			g.mainClosing.Store(true)
 			g.mainWin.Close()
 		}
+		if g.logsWin != nil {
+			g.logsWin.Close()
+		}
 		if g.onTraySync != nil {
 			g.onTraySync()
 		}
@@ -1350,6 +1354,45 @@ func (g *GuiApp) OpenAnalysisWindow() {
 		g.analysisWin = win
 		win.RegisterHook(events.Common.WindowClosing, func(_ *application.WindowEvent) {
 			g.analysisWin = nil
+		})
+		win.Show()
+		win.Center()
+		win.Focus()
+	})
+}
+
+// OpenLogsWindow 打开或聚焦「实时日志」独立窗口（单例模式）。
+func (g *GuiApp) OpenLogsWindow() {
+	wailsApp := application.Get()
+	if wailsApp == nil {
+		return
+	}
+	application.InvokeAsync(func() {
+		if g.logsWin != nil {
+			if g.logsWin.IsMinimised() {
+				g.logsWin.UnMinimise()
+			}
+			g.logsWin.Show()
+			g.logsWin.Focus()
+			return
+		}
+
+		win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:           "logs",
+			Title:          "Subs Free — 实时日志",
+			Width:          780,
+			Height:         500,
+			MinWidth:       520,
+			MinHeight:      360,
+			DisableResize:  false,
+			Frameless:      false,
+			URL:            "/?window=logs",
+			Mac:            macWindowOpts(30),
+			BackgroundType: application.BackgroundTypeTranslucent,
+		})
+		g.logsWin = win
+		win.RegisterHook(events.Common.WindowClosing, func(_ *application.WindowEvent) {
+			g.logsWin = nil
 		})
 		win.Show()
 		win.Center()
