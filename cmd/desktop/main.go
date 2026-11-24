@@ -2,10 +2,10 @@
 package main
 
 import (
-	"slices"
 	"embed"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -62,8 +62,8 @@ func main() {
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				slog.Debug("收到第二实例唤醒", "args", data.Args)
 				if slices.Contains(data.Args, "--hidden") {
-						return
-					}
+					return
+				}
 				guiApp.showActiveWindow()
 			},
 		},
@@ -96,11 +96,11 @@ func main() {
 	// 仅在「静默自启 且 无端口冲突」时隐藏启动；端口冲突时必须显示主界面处理
 	if startHidden && !guiApp.pendingInit {
 		windowVisible.Store(false)
-		slog.Info("检测到 --hidden 参数，静默启动到系统托盘")
+		slog.Info("已静默启动到系统托盘", "arg", "--hidden")
 	} else {
 		guiApp.createMainWindow()
-		if startHidden && guiApp.pendingInit {
-			slog.Warn("检测到 --hidden 启动但存在端口冲突，已自动显示主界面")
+		if startHidden {
+			slog.Warn("端口冲突，已跳过静默并显示主界面", "arg", "--hidden")
 		}
 	}
 
