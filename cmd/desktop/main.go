@@ -2,6 +2,7 @@
 package main
 
 import (
+	"slices"
 	"embed"
 	"log/slog"
 	"os"
@@ -60,6 +61,9 @@ func main() {
 			EncryptionKey: singleInstanceKey,
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				slog.Debug("收到第二实例唤醒", "args", data.Args)
+				if slices.Contains(data.Args, "--hidden") {
+						return
+					}
 				guiApp.showActiveWindow()
 			},
 		},
@@ -105,9 +109,6 @@ func main() {
 			slog.Warn("检测到 --hidden 启动但存在端口冲突，已自动显示窗口")
 		}
 	}
-
-	// 启动时只创建登录窗口；WebUI 窗口在点击「进入管理界面」时再按需创建
-	guiApp.createLoginWindow()
 
 	// 退出生命周期清理
 	wailsApp.OnShutdown(func() {
