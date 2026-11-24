@@ -2389,24 +2389,59 @@ code {
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--fg);
-  opacity: 0.88;
-  padding: 1px 0;
+  line-height: 1.6;
+  padding: 2px 0;
 }
 
-.desk-log-line.lvl-err {
-  color: #ef4444;
-}
-
-.desk-log-line.lvl-warn {
-  color: var(--warn);
-}
-
-.desk-log-line.lvl-info {
-  color: var(--fg);
-}
-
-.desk-log-empty {
+.desk-log-time {
   color: var(--muted);
-  text-align: center;
-  padding: 40px 0;
+  opacity: 0.55;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-log-lvl {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0 5px;
+  border-radius: 4px;
+  margin-right: 6px;
+  letter-spacing: 0.02em;
+}
+
+.desk-log-lvl.is-info {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.desk-log-lvl.is-warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.desk-log-lvl.is-err {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.desk-log-lvl.is-dbg {
+  color: var(--muted);
+  background: var(--code-bg);
+}
+
+.desk-log-msg {
+  opacity: 0.9;
+}
+
+.desk-log-key {
+  color: var(--muted);
+}
+
+.desk-log-url {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 2px;
 }

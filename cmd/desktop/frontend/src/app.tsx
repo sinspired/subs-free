@@ -36,6 +36,96 @@ async function openLink(
   }
 }
 
+// ── 实时日志轻量解析 ──────────────────────────────────────────────
+const LOG_NOISE_RE = /\[WebView2\]|received DATA after END_STREAM/;
+const LOG_ANSI_RE = /\x1b\[[\d;]*m/g;
+const LOG_TS_RE = /^\[?((?:\d{4}[-/])?\d{2}[-/]\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\]?/;
+const LOG_LVL_RE = /^\s*\[?(INF|INFO|WRN|WARN|ERR|ERROR|DBG|DEBUG)\]?(?=\s|$)/;
+const LOG_BODY_TOKEN_RE = /(https?:\/\/[^\s"'\\<>]+)|(^|\s)([a-zA-Z0-9_\u4e00-\u9fa5.\-[\]]+)=/g;
+
+type LogLevelKind = 'info' | 'warn' | 'err' | 'dbg';
+
+interface ParsedLogLine {
+  time: string;
+  level: string;
+  levelKind?: LogLevelKind;
+  tokens: Array<{ type: 'text' | 'key' | 'url'; value: string }>;
+}
+
+function normalizeLogLevel(raw: string): { label: string; kind: LogLevelKind } {
+  switch (raw) {
+    case 'ERR':
+    case 'ERROR':
+      return { label: 'ERR', kind: 'err' };
+    case 'WRN':
+    case 'WARN':
+      return { label: 'WRN', kind: 'warn' };
+    case 'DBG':
+    case 'DEBUG':
+      return { label: 'DBG', kind: 'dbg' };
+    default:
+      return { label: 'INF', kind: 'info' };
+  }
+}
+
+function tokenizeLogBody(body: string): ParsedLogLine['tokens'] {
+  const tokens: ParsedLogLine['tokens'] = [];
+  let lastIndex = 0;
+  LOG_BODY_TOKEN_RE.lastIndex = 0;
+
+  let m: RegExpExecArray | null;
+  while ((m = LOG_BODY_TOKEN_RE.exec(body)) !== null) {
+    const [full, url, space, key] = m;
+    if (m.index > lastIndex) {
+      tokens.push({ type: 'text', value: body.slice(lastIndex, m.index) });
+    }
+    if (url) {
+      tokens.push({ type: 'url', value: url });
+    } else if (key) {
+      if (space) tokens.push({ type: 'text', value: space });
+      tokens.push({ type: 'key', value: `${key}=` });
+    } else {
+      tokens.push({ type: 'text', value: full });
+    }
+    lastIndex = m.index + full.length;
+  }
+
+  if (lastIndex < body.length) {
+    tokens.push({ type: 'text', value: body.slice(lastIndex) });
+  }
+  return tokens;
+}
+
+function parseLogLine(line: string): ParsedLogLine {
+  let rest = line.replace(LOG_ANSI_RE, '');
+  let time = '';
+
+  const tsMatch = rest.match(LOG_TS_RE);
+  if (tsMatch) {
+    time = tsMatch[1];
+    rest = rest.slice(tsMatch[0].length);
+  }
+
+  let level = '';
+  let levelKind: LogLevelKind | undefined;
+  const lvlMatch = rest.match(LOG_LVL_RE);
+  if (lvlMatch) {
+    const norm = normalizeLogLevel(lvlMatch[1]);
+    level = norm.label;
+    levelKind = norm.kind;
+    rest = rest.slice(lvlMatch[0].length).trimStart();
+  } else {
+    rest = rest.trimStart();
+  }
+
+  return {
+    time,
+    level,
+    levelKind,
+    tokens: tokenizeLogBody(rest),
+  };
+}
+
 export function App() {
   const ready = useWailsReady();
   const { theme, toggleTheme, syncFromServer } = useTheme();
@@ -135,7 +225,10 @@ export function App() {
         : typeof parsed?.logs === 'string'
           ? parsed.logs.split('\n')
           : [];
-      setLogLines(lines.slice(-150));
+      const cleaned = lines
+        .map(l => l.replace(LOG_ANSI_RE, ''))
+        .filter(l => l.trim() !== '' && !LOG_NOISE_RE.test(l));
+      setLogLines(cleaned.slice(-150));
     } catch { /* 忽略 */ }
   }
 
@@ -834,21 +927,28 @@ export function App() {
               {logLines.length === 0 ? (
                 <div class="desk-log-empty">暂无日志记录</div>
               ) : (
-                logLines.map((line, idx) => (
-                  <div
-                    key={idx}
-                    class={`desk-log-line${/\b(ERR|ERROR)\b/.test(line)
-                      ? ' lvl-err'
-                      : /\b(WRN|WARN)\b/.test(line)
-                        ? ' lvl-warn'
-                        : /\b(INF|INFO)\b/.test(line)
-                          ? ' lvl-info'
-                          : ''
-                      }`}
-                  >
-                    {line}
-                  </div>
-                ))
+                logLines.map((line, idx) => {
+                  const item = parseLogLine(line);
+                  return (
+                    <div key={idx} class="desk-log-line">
+                      {item.time && <span class="desk-log-time">{item.time}</span>}
+                      {item.level && (
+                        <span class={`desk-log-lvl is-${item.levelKind}`}>{item.level}</span>
+                      )}
+                      <span class="desk-log-msg">
+                        {item.tokens.map((tok, ti) =>
+                          tok.type === 'url' ? (
+                            <span key={ti} class="desk-log-url">{tok.value}</span>
+                          ) : tok.type === 'key' ? (
+                            <span key={ti} class="desk-log-key">{tok.value}</span>
+                          ) : (
+                            tok.value
+                          )
+                        )}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
