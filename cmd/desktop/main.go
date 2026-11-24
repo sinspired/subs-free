@@ -37,7 +37,7 @@ func main() {
 
 	wailsApp := application.New(application.Options{
 		Name:        "Subs Free",
-		Description: "订阅检测桌面管理面板",
+		Description: "订阅检测控制面板",
 		Services: []application.Service{
 			application.NewService(guiApp),
 			application.NewService(notifier),
@@ -91,35 +91,29 @@ func main() {
 	guiApp.autostart = wailsApp.Autostart
 
 	// 解析 --hidden 启动参数（由 Wails AutostartOptions.Arguments 注入）
-	startHidden := false
-	for _, arg := range os.Args[1:] {
-		if arg == "--hidden" {
-			startHidden = true
-			break
-		}
-	}
+	startHidden := slices.Contains(os.Args[1:], "--hidden")
 
-	// 仅在「静默自启 且 无端口冲突」时隐藏启动；一旦端口冲突，必须弹窗让用户处理
+	// 仅在「静默自启 且 无端口冲突」时隐藏启动；端口冲突时必须显示主界面处理
 	if startHidden && !guiApp.pendingInit {
 		windowVisible.Store(false)
 		slog.Info("检测到 --hidden 参数，静默启动到系统托盘")
 	} else {
-		guiApp.createLoginWindow()
+		guiApp.createMainWindow()
 		if startHidden && guiApp.pendingInit {
-			slog.Warn("检测到 --hidden 启动但存在端口冲突，已自动显示窗口")
+			slog.Warn("检测到 --hidden 启动但存在端口冲突，已自动显示主界面")
 		}
 	}
 
 	// 退出生命周期清理
 	wailsApp.OnShutdown(func() {
-		slog.Info("GUI 程序正在退出，执行清理工作…")
+		slog.Info("Subs Free 正在退出，执行清理工作…")
 		if guiApp.IsBackendReady() {
 			if err := guiApp.backend.Shutdown(); err != nil {
 				slog.Error("关闭应用失败", "error", err)
 			}
 		}
-		slog.Info("GUI 程序已退出")
-		sendOSNotification("Subs Check PRO", "GUI 程序已关闭")
+		slog.Info("Subs Free 已退出")
+		sendOSNotification("Subs Free", "应用已关闭")
 	})
 
 	onQuit := func() { wailsApp.Quit() }
@@ -131,7 +125,7 @@ func main() {
 		slog.Debug("Wails 就绪，后端初始化完成", "appReady", appInitOK)
 
 		if startHidden && guiApp.pendingInit {
-			sendOSNotification("Subs Free 端口冲突", "检测到端口被占用，已为您打开端口设置窗口")
+			sendOSNotification("Subs Free 端口冲突", "检测到端口被占用，已为您打开端口设置界面")
 		}
 
 		go guiupdater.CheckUpdateStatus(wailsApp)

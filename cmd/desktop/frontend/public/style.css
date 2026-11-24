@@ -365,7 +365,7 @@ button:focus-visible {
 /* 进入按钮区：固定间距贴近底部版本栏，不参与 flex 拉伸 */
 .enter-spacer {
   flex-shrink: 0;
-  padding-bottom: 10px;
+  padding-bottom: 14px;
 }
 
 /* ── 进入按钮 ── */
@@ -922,6 +922,7 @@ code {
   align-items: center;
   justify-content: center;
   padding: 0 20px;
+  margin-bottom: -25px;
   --wails-draggable: drag;
 }
 
@@ -935,11 +936,31 @@ code {
 
 /* ── 社交链接行（含开机自启 + 后台运行 + 竖线分割） ── */
 .brand-links {
+  position: relative;
   display: flex;
   gap: 7px;
   align-items: center;
-  padding-bottom: 2px;
+  padding-top: 10px;
+  padding-bottom: 0;
+  height: 32px;
   -webkit-app-region: no-drag;
+}
+
+/* 左栏链接区上方：与左栏竖线同款的渐隐 1px 淡横线 */
+.brand-links::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -14px;
+  right: -14px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--border) 75%, transparent),
+    transparent
+  );
+  pointer-events: none;
 }
 
 /* 开机自启 / 后台运行 / 检查更新图标按钮 */
@@ -1694,7 +1715,7 @@ code {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 54px;
+  bottom: 58px;
   z-index: 50;
   background: var(--card);
   border: 1px solid var(--border);
@@ -1976,4 +1997,416 @@ code {
 .upd-btn-secondary:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ══════════════════════════════════════════════════
+   桌面端主界面：居中密钥 + 三段操作栏(含背景进度) + 静音底部状态
+   ══════════════════════════════════════════════════ */
+
+.key-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 10px;
+  min-height: 0;
+}
+
+/* 按钮区与底部分割线之间保持 14px 呼吸间距 */
+.enter-spacer {
+  flex-shrink: 0;
+  padding-bottom: 14px;
+}
+
+/* 三段式主操作栏：[圆形开始/停止] [ 进入管理界面 → ] [圆形关于] */
+.enter-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.enter-action-row .btn-enter {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  width: auto; /* 覆盖原 .btn-enter 的 width: 100%，防止挤压左右圆形按钮 */
+  min-width: 0;
+  height: 36px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.enter-action-row .btn-enter:hover:not(:disabled) {
+  color: var(--accent);
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.btn-enter-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  transition: width 0.35s ease;
+}
+
+.btn-enter-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* 左右圆形动作按钮：与 .btn-enter 保持完全一致的无边框轻投影悬浮质感 */
+.btn-circle-action {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--card);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--fg) 6%, transparent);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    transform 0.1s,
+    box-shadow 0.15s;
+}
+
+.btn-circle-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-circle-action:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn-circle-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-circle-action.btn-play {
+  color: var(--accent);
+}
+
+.btn-circle-action.btn-play:hover:not(:disabled) {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.btn-circle-action.btn-stop {
+  background: #ef4444;
+  color: #fff;
+  animation: deskStopPulse 2s infinite;
+}
+
+.btn-circle-action.btn-about:hover:not(:disabled) {
+  color: var(--fg);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+@keyframes deskStopPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.32);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* 左栏链接区分割线上方：高 36px + 底距 14px，与右侧 .enter-action-row 精确齐平 */
+.brand-status-block {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.brand-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2.5px 9px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--muted);
+  opacity: 0.82;
+}
+
+.brand-status-pill.is-active {
+  color: var(--accent);
+  background: var(--info-bg);
+  opacity: 1;
+}
+
+.brand-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-status-sub {
+  max-width: 100%;
+  font-size: 9.5px;
+  line-height: 1.25;
+  color: var(--muted);
+  opacity: 0.56;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-status-dot {
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+.desk-status-dot.checking {
+  animation: upd-badge-pulse 1.4s ease-in-out infinite;
+}
+
+/* 右栏底部：保持纯透底，改用两端轻渐隐 1px 分割线与左栏统一 */
+.desk-quiet-footer {
+  position: relative;
+  padding: 10px 0 20px;
+  border-top: none;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-quiet-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--border) 50%, transparent) 12%,
+    color-mix(in srgb, var(--border) 50%, transparent) 88%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.desk-pipe-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 22px;
+  align-items: center;
+}
+
+.desk-pipe-cell {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* 用 1px×10px CSS 竖线取代字符 |，更纤细居中 */
+.desk-pipe-cell + .desk-pipe-cell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 10px;
+  background: color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+.desk-pv {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg);
+  opacity: 0.72;
+}
+
+.desk-pv.is-accent {
+  color: var(--accent);
+  opacity: 0.95;
+}
+
+.desk-pl {
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.62;
+}
+
+.desk-pipe-empty {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.58;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* API 密钥标题行 & 收敛后的行内小标签 */
+.desk-key-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.desk-key-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.desk-inline-tag {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.desk-inline-tag.is-info {
+  color: var(--accent);
+  background: var(--first-run-bg);
+  border: 1px solid var(--first-run-bd);
+}
+
+.desk-inline-tag.is-warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-bd);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.desk-inline-tag.is-warn:hover {
+  opacity: 0.85;
+}
+
+/* API Key 行内编辑 */
+.key-wrap.editing {
+  border-color: var(--accent);
+}
+
+.key-wrap.just-saved {
+  border-color: var(--success);
+}
+
+.key-text-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  padding: 0;
+}
+
+.icon-btn.btn-save-active {
+  color: var(--accent);
+}
+
+/* 快捷实时日志弹窗 */
+.desk-log-dialog {
+  width: min(560px, calc(100vw - 32px));
+  height: min(410px, calc(100vh - 44px));
+  display: flex;
+  flex-direction: column;
+}
+
+.desk-log-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+.desk-log-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.desk-log-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  background: var(--bg);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.desk-log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--fg);
+  opacity: 0.88;
+  padding: 1px 0;
+}
+
+.desk-log-line.lvl-err {
+  color: #ef4444;
+}
+
+.desk-log-line.lvl-warn {
+  color: var(--warn);
+}
+
+.desk-log-line.lvl-info {
+  color: var(--fg);
+}
+
+.desk-log-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 40px 0;
 }

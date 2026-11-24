@@ -19,10 +19,17 @@ import * as updater$0 from "../../updater/models.js";
 import * as $models from "./models.js";
 
 /**
- * BackToLogin 从 WebUI 返回登录窗口（销毁 WebUI 进程并打开登录窗口）
+ * APIProxy 在进程内直调 Gin 路由，供桌面主界面无 CORS 地读写配置、启停检测、拉取报告与日志。
  */
-export function BackToLogin(): $CancellablePromise<void> {
-    return $Call.ByID(2210097929);
+export function APIProxy(method: string, path: string, body: string): $CancellablePromise<string> {
+    return $Call.ByID(2267284878, method, path, body);
+}
+
+/**
+ * BackToMain 从管理面板返回 App 主界面（销毁 WebUI 进程并重新打开主界面）
+ */
+export function BackToMain(): $CancellablePromise<void> {
+    return $Call.ByID(1462101649);
 }
 
 /**
@@ -40,7 +47,7 @@ export function CompleteInit(): $CancellablePromise<void> {
 }
 
 /**
- * EnterWebUI 由前端调用：按需创建并进入 WebUI 大窗，同时销毁登录小窗。
+ * EnterWebUI 由前端调用：按需创建本地 WebUI 管理面板大窗，同时销毁主界面窗口省内存。
  */
 export function EnterWebUI(): $CancellablePromise<void> {
     return $Call.ByID(551937120);
@@ -61,14 +68,14 @@ export function GetAppInfo(): $CancellablePromise<$models.AppInfo> {
 }
 
 /**
- * GetAutoStartEnabled 查询当前开机自启状态（供托盘菜单调用）。
+ * GetAutoStartEnabled 查询当前开机自启状态。
  */
 export function GetAutoStartEnabled(): $CancellablePromise<boolean> {
     return $Call.ByID(2283529356);
 }
 
 /**
- * GetCheckState 返回当前后端的检测进度状态，供灵动岛等前端页面调用
+ * GetCheckState 返回当前后端的检测进度与下次检测时间
  */
 export function GetCheckState(): $CancellablePromise<$models.CheckState> {
     return $Call.ByID(3279137383);
@@ -142,7 +149,14 @@ export function IsBackendReady(): $CancellablePromise<boolean> {
 }
 
 /**
- * NotifyAutostartChanged 安全同步开机自启状态到登录窗。
+ * MarkAPIKeyManual 标记本次运行期间已手动设置过 API Key，立刻消除随机密钥告警。
+ */
+export function MarkAPIKeyManual(): $CancellablePromise<void> {
+    return $Call.ByID(412753314);
+}
+
+/**
+ * NotifyAutostartChanged 安全向主界面同步开机自启 / 静默自启状态变化事件。
  */
 export function NotifyAutostartChanged(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(943159520, enabled);
@@ -226,7 +240,7 @@ export function SetAutoStart(enabled: boolean): $CancellablePromise<void> {
 }
 
 /**
- * SetAutoStartEnabled 保留兼容旧调用。
+ * SetAutoStartEnabled 保留兼容调用。
  */
 export function SetAutoStartEnabled(enable: boolean): $CancellablePromise<void> {
     return $Call.ByID(197427528, enable);
@@ -254,7 +268,7 @@ export function SetSilentAutoStart(silent: boolean): $CancellablePromise<void> {
 }
 
 /**
- * ShowWindow 供前端主动调用，显示并聚焦登录窗口。
+ * ShowWindow 供前端主动调用，显示并聚焦主界面窗口。
  */
 export function ShowWindow(): $CancellablePromise<void> {
     return $Call.ByID(91192051);

@@ -52,7 +52,8 @@ func registerGuiRoutes(router *gin.Engine) {
 	router.Use(guiCORSMiddleware())
 	router.GET("/gui/enter", handleGuiEnter)
 	router.GET("/gui/popup", handleGuiPopup)
-	router.GET("/gui/back-to-login", handleGuiBackToLogin)
+	router.GET("/gui/back-to-login", handleGuiBackToMain)
+	router.GET("/gui/back-to-main", handleGuiBackToMain)
 	router.GET("/gui/open-about", handleGuiOpenAbout)
 	router.GET("/gui/open-files", handleGuiOpenFiles)
 	router.GET("/gui/open-analysis", handleGuiOpenAnalysis)
@@ -180,8 +181,8 @@ func handleGuiPopup(c *gin.Context) {
 	})
 }
 
-// handleGuiBackToLogin 接收来自 WebUI 的"返回登录窗口"请求。
-func handleGuiBackToLogin(c *gin.Context) {
+// handleGuiBackToMain 接收来自 WebUI 的"回主界面"请求。
+func handleGuiBackToMain(c *gin.Context) {
 	if !isLoopback(c) {
 		c.String(http.StatusForbidden, "forbidden")
 		return
@@ -189,7 +190,7 @@ func handleGuiBackToLogin(c *gin.Context) {
 	c.String(http.StatusOK, "ok")
 	if globalGuiApp != nil {
 		application.InvokeAsync(func() {
-			globalGuiApp.BackToLogin()
+			globalGuiApp.BackToMain()
 		})
 	}
 }

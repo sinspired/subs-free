@@ -22,7 +22,7 @@ import (
 //   - /webui/… 其他  → 从 webui.TemplatesFS 直接提供（未来扩展用）
 //   - 其余路径        → 转给 frontend/dist 处理器（React 登录页）
 //
-// 这样 loginWin 继续使用 frontend/dist，webUIWin 使用 /webui/* 路径，
+// 这样 mainWin 继续使用 frontend/dist，webUIWin 使用 /webui/* 路径，
 // 两个窗口共用同一个 Wails 资产服务器，无需各自独立的 HTTP 服务。
 // ⚠️ getListenPort 必须是函数引用而非字符串值：
 // Wails 应用对象在 main() 中仅初始化一次，此时若端口冲突则后端尚未启动，
@@ -93,7 +93,7 @@ func newCombinedAssetHandler(getConfigPath func() string, getPort func() string)
 			}
 			staticHandler.ServeHTTP(w, r2)
 
-		// ── 默认：交给 React 前端处理器（loginWin 的资产）──────────────────
+		// ── 默认：交给 React 前端处理器（mainWin 的资产）──────────────────
 		default:
 			frontendHandler.ServeHTTP(w, r)
 		}

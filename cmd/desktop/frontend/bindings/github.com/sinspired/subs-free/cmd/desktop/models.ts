@@ -23,14 +23,18 @@ export interface AppInfo {
 }
 
 /**
- * CheckState 前端展示检测进度所需的状态信息
+ * CheckState 前端展示检测进度与下次计划所需的状态信息
  */
 export interface CheckState {
     "isChecking": boolean;
     "stepName": string;
+    "available": number;
     "progress": number;
     "proxyCount": number;
     "lastResult": string;
+    "nextCheckTime": string;
+    "nextCheckUnix": number;
+    "scheduleMode": string;
 }
 
 /**
@@ -38,13 +42,9 @@ export interface CheckState {
  */
 export interface TrayWindowState {
     /**
-     * "background" | "login" | "webui"
+     * "background" | "main" | "webui"
      */
     "Mode": string;
-
-    /**
-     * 窗口当前是否可见且未最小化
-     */
     "IsVisible": boolean;
 }
 

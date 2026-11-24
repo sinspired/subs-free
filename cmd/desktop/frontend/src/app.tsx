@@ -1,8 +1,8 @@
 /**
  * frontend/src/app.tsx
- * 登录窗口根组件 — Wails3 + Preact + TypeScript
+ * 桌面主界面根组件 — Wails3 + Preact + TypeScript
  */
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useState, useRef } from 'preact/hooks';
 import { Events } from '@wailsio/runtime';
 
 import { useTheme } from './hooks/useTheme';
@@ -10,7 +10,7 @@ import { useToast } from './hooks/useToast';
 import { useWailsReady } from './hooks/useWailsReady';
 
 import { Header } from './components/Header';
-import { KeySection } from './components/KeySection';
+import { KeySection, DesktopCheckState, LastStats } from './components/KeySection';
 import { PortConflict } from './components/PortConflict';
 import { PasswordConfirm } from './components/PasswordConfirm';
 import { Toast } from './components/Toast';
@@ -68,6 +68,14 @@ export function App() {
   const [showUpdaterToken, setShowUpdaterToken] = useState(false);
   const [savingUpdater, setSavingUpdater] = useState(false);
 
+  // 主界面检测状态看板与快捷日志状态
+  const [checkStatus, setCheckStatus] = useState<DesktopCheckState | null>(null);
+  const [lastStats, setLastStats] = useState<LastStats | null>(null);
+  const [finalizing, setFinalizing] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [logLines, setLogLines] = useState<string[]>([]);
+  const logBodyRef = useRef<HTMLDivElement>(null);
+
   async function syncUpdaterSettings() {
     try {
       const s = await GuiApp.GetUpdaterSettings();
@@ -79,6 +87,56 @@ export function App() {
     } catch {
       return null;
     }
+  }
+
+  async function fetchLastCheckStats() {
+    try {
+      const raw = await GuiApp.APIProxy('GET', '/api/analysis-report', '');
+      const res = JSON.parse(raw) as { status: number; body: string };
+      if (res.status >= 300 || !res.body) return;
+      const bodyObj = JSON.parse(res.body);
+      const yaml: string = bodyObj?.report || '';
+      if (!yaml) return;
+
+      const duration = yaml.match(/check_duration_raw:\s*(\d+)/)?.[1];
+      const total = yaml.match(/check_count_raw:\s*(\d+)/)?.[1];
+      const available = yaml.match(/alive_count:\s*(\d+)/)?.[1];
+      const traffic = yaml.match(/check_traffic_total:\s*(.+)/)?.[1];
+      let time = yaml.match(/check_time_raw:\s*['"]?(.*?)['"]?(?:\n|$)/)?.[1];
+
+      if (time) {
+        const d = new Date(time.replace(' ', 'T'));
+        if (!isNaN(d.getTime())) {
+          time = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+      }
+      if (total && available) {
+        setLastStats({
+          time: time || '-',
+          duration: duration
+            ? (parseInt(duration) >= 60 ? `${Math.floor(parseInt(duration) / 60)} 分` : `${duration} 秒`)
+            : '0 秒',
+          total: parseInt(total) >= 10000 ? (parseInt(total) / 10000).toFixed(1) + '万' : total,
+          available,
+          traffic: traffic || '-',
+        });
+      }
+    } catch { /* 忽略 */ }
+  }
+
+  async function fetchLogsOnce() {
+    try {
+      const raw = await GuiApp.APIProxy('GET', '/api/logs', '');
+      const res = JSON.parse(raw) as { status: number; body: string };
+      if (res.status >= 300 || !res.body) return;
+      const parsed = JSON.parse(res.body);
+      const lines: string[] = Array.isArray(parsed?.logs)
+        ? parsed.logs.map(String)
+        : typeof parsed?.logs === 'string'
+          ? parsed.logs.split('\n')
+          : [];
+      setLogLines(lines.slice(-150));
+    } catch { /* 忽略 */ }
   }
 
   // ── Wails 就绪后立即拉取应用信息与偏好设置 ─────────────────────
@@ -158,7 +216,7 @@ export function App() {
     };
   }, [ready]);
 
-  // ── 监听托盘「开机自启 / 静默自启」切换事件，回查真实状态 ─────
+  // ── 监听托盘「开机自启 / 静默自启」切换事件 ───────────────────
   useEffect(() => {
     if (!ready) return;
     const unsub = Events.On('autostart:changed', async () => {
@@ -169,14 +227,64 @@ export function App() {
         ]);
         setAutostart(actual);
         setSilentAutostart(silent);
-      } catch { /* 平台不支持时静默忽略 */ }
+      } catch { /* 忽略 */ }
     });
     return () => { unsub && unsub(); };
   }, [ready]);
 
-  // ── 点击外部或按 Esc 自动关闭设置菜单 / 更新器弹窗 ─────────────
+  // ── 主界面检测状态轮询（窗口隐藏/最小化时自动暂停）─────────────
   useEffect(() => {
-    if (!showSettings && !showUpdaterModal) return;
+    if (!ready || view !== 'main') return;
+    let timer: number | undefined;
+
+    const poll = async () => {
+      if (document.hidden) return;
+      try {
+        const next = await GuiApp.GetCheckState();
+        setCheckStatus(prev => {
+          if (prev?.isChecking && !next.isChecking) {
+            setFinalizing(true);
+            fetchLastCheckStats().finally(() => setFinalizing(false));
+          }
+          return next;
+        });
+      } catch { /* 忽略 */ }
+    };
+
+    poll();
+    fetchLastCheckStats();
+    timer = window.setInterval(poll, 1000);
+
+    const onVis = () => {
+      if (!document.hidden) poll();
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      if (timer) window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [ready, view]);
+
+  // ── 快捷日志弹窗打开时才轮询日志，关闭即销毁定时器 ────────────
+  useEffect(() => {
+    if (!showLogModal) return;
+    fetchLogsOnce();
+    const timer = window.setInterval(() => {
+      if (!document.hidden) fetchLogsOnce();
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [showLogModal]);
+
+  useEffect(() => {
+    if (showLogModal && logBodyRef.current) {
+      logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
+    }
+  }, [logLines, showLogModal]);
+
+  // ── 点击外部或按 Esc 自动关闭设置菜单 / 弹窗 ──────────────────
+  useEffect(() => {
+    if (!showSettings && !showUpdaterModal && !showLogModal) return;
     const onDown = (e: MouseEvent) => {
       if (!showSettings) return;
       const t = e.target as HTMLElement | null;
@@ -187,6 +295,7 @@ export function App() {
       if (e.key === 'Escape') {
         setShowSettings(false);
         setShowUpdaterModal(false);
+        setShowLogModal(false);
       }
     };
     document.addEventListener('mousedown', onDown);
@@ -195,7 +304,7 @@ export function App() {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [showSettings, showUpdaterModal]);
+  }, [showSettings, showUpdaterModal, showLogModal]);
 
   async function loadAppInfo() {
     setView('loading');
@@ -221,6 +330,7 @@ export function App() {
     (window as any).__CORE_BASE_URL = `http://127.0.0.1:${newInfo.listenPort}`;
     syncFromServer();
     syncUpdaterSettings();
+    setLastStats(null);
     setInfo(newInfo);
     setView('main');
   }
@@ -235,6 +345,7 @@ export function App() {
       (window as any).__CORE_BASE_URL = `http://127.0.0.1:${newInfo.listenPort}`;
       syncFromServer();
       syncUpdaterSettings();
+      setLastStats(null);
       setInfo(newInfo);
     }
     setView('main');
@@ -310,7 +421,7 @@ export function App() {
   // ── 左侧品牌面板（函数式渲染，避免切换菜单时重挂载 Logo）──────
   const renderBrandPanel = () => (
     <aside class="brand-panel">
-      {/* 品牌主体：大 Logo */}
+      {/* 品牌主体：大 Logo + 品牌下方版本标签 */}
       <div class="brand-body">
         <img src="/logo.svg" alt="logo" class="brand-icon" />
       </div>
@@ -329,8 +440,8 @@ export function App() {
           {autostartEnabled && (
             <div class="bsm-item bsm-sub-item" onClick={handleToggleSilentAutostart}>
               <div class="bsm-text">
-                <span class="bsm-title">静默启动</span>
-                <span class="bsm-sub">自启时不显示窗口</span>
+                <span class="bsm-title">静默自启</span>
+                <span class="bsm-sub">自启时隐藏窗口进托盘</span>
               </div>
               <span class={`bsm-switch${silentAutostart ? ' on' : ''}`} />
             </div>
@@ -369,6 +480,26 @@ export function App() {
           </button>
         </div>
       )}
+      {/* 左栏分割线上方：居中静音展示当前状态与检测时间 */}
+      {view === 'main' && (
+        <div class="brand-status-block">
+          <div class={`brand-status-pill${checkStatus?.isChecking || finalizing ? ' is-active' : ''}`}>
+            <span class={`desk-status-dot${checkStatus?.isChecking || finalizing ? ' checking' : ''}`} />
+            <span class="brand-status-text">
+              {checkStatus?.isChecking
+                ? (checkStatus.stepName || '检测中')
+                : finalizing
+                  ? '正在整理结果…'
+                  : '空闲'}
+            </span>
+          </div>
+          <div class="brand-status-sub">
+            {lastStats ? `最后 ${lastStats.time}` : (checkStatus?.lastResult || '尚无检测记录')}
+            {checkStatus?.nextCheckTime ? ` · 下次 ${checkStatus.nextCheckTime}` : ''}
+          </div>
+        </div>
+      )}
+
 
       {/* ── 底部工具行：设置 | github tg docker | 检查更新 */}
       <nav class="brand-links">
@@ -471,30 +602,6 @@ export function App() {
     </div>
   );
 
-  // ── 右侧底栏：版本标签 ──
-  const LpFooter = () => {
-    if (!info) return <div class="lp-footer" />;
-    return (
-      <div class="lp-footer">
-        <a
-          class="ver-tag ver-gui"
-          onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-free')}
-          title={`GUI 版本：${info.guiVersion || 'dev'}  →  sinspired/subs-free`}
-        >
-          GUI&nbsp;{info.guiVersion || 'dev'}
-        </a>
-        <span class="ver-dot">·</span>
-        <a
-          class="ver-tag ver-core"
-          onClick={() => openLink('https://proxy.linkpc.dpdns.org/https://github.com/sinspired/subs-check-pro')}
-          title={`内核 版本：${info.coreVersion || 'dev'}  →  sinspired/subs-check-pro`}
-        >
-          内核&nbsp;{info.originVersion || 'dev'}
-        </a>
-      </div>
-    );
-  };
-
   return (
     <>
       {/* ── loading ── */}
@@ -531,21 +638,30 @@ export function App() {
             <div class="login-content login-content--conflict">
               <PortConflict info={info} toast={toast} onFixed={handlePortsFixed} />
             </div>
-            <LpFooter />
           </section>
         </div>
       )}
 
-      {/* ── main ── */}
+      {/* ── main（App 主界面）── */}
       {view === 'main' && info && (
         <div class="page split-page">
           {renderBrandPanel()}
           <section class="login-panel">
             <PanelToolbar portInfo={info} />
             <div class="login-content">
-              <KeySection info={info} toast={toast} onSelectConfig={handleSelectConfig} />
+              <KeySection
+                info={info}
+                status={checkStatus}
+                lastStats={lastStats}
+                finalizing={finalizing}
+                toast={toast}
+                onSelectConfig={handleSelectConfig}
+                onApiKeySaved={newKey =>
+                  setInfo(prev => (prev ? { ...prev, apiKey: newKey, keyIsRandom: false } : prev))
+                }
+                onOpenLogs={() => setShowLogModal(true)}
+              />
             </div>
-            <LpFooter />
           </section>
         </div>
       )}
@@ -565,7 +681,6 @@ export function App() {
                 onReselect={handlePasswordReselect}
               />
             </div>
-            <LpFooter />
           </section>
         </div>
       )}
@@ -576,6 +691,7 @@ export function App() {
         <QuitDialog onClose={() => setShowQuit(false)} />
       )}
 
+      {/* ── 更新器设置弹窗 ── */}
       {showUpdaterModal && (
         <div
           class="quit-overlay"
@@ -665,6 +781,75 @@ export function App() {
                   {savingUpdater ? '保存中…' : '保存'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 快捷实时日志弹窗 ── */}
+      {showLogModal && (
+        <div
+          class="quit-overlay"
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowLogModal(false);
+          }}
+        >
+          <div class="quit-dialog desk-log-dialog">
+            <div class="upd-header desk-log-header">
+              <div>
+                <span class="upd-title">实时日志</span>
+                <span class="upd-desc" style="margin-left:8px;">最近 {logLines.length} 行</span>
+              </div>
+              <div class="desk-log-actions">
+                <button class="icon-btn upd-eye-btn" onClick={fetchLogsOnce} title="立即刷新">刷新</button>
+                <button
+                  class="icon-btn upd-eye-btn"
+                  onClick={async () => {
+                    await GuiApp.APIProxy('POST', '/api/logs/clear', '');
+                    setLogLines([]);
+                    toast('日志已清空');
+                  }}
+                  title="清空日志"
+                >
+                  清空
+                </button>
+                <button
+                  class="icon-btn upd-eye-btn"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(logLines.join('\n'));
+                      toast('已复制日志');
+                    } catch {
+                      toast('复制失败');
+                    }
+                  }}
+                >
+                  复制
+                </button>
+                <button class="icon-btn upd-eye-btn" onClick={() => setShowLogModal(false)}>关闭</button>
+              </div>
+            </div>
+
+            <div class="desk-log-body" ref={logBodyRef}>
+              {logLines.length === 0 ? (
+                <div class="desk-log-empty">暂无日志记录</div>
+              ) : (
+                logLines.map((line, idx) => (
+                  <div
+                    key={idx}
+                    class={`desk-log-line${/\b(ERR|ERROR)\b/.test(line)
+                      ? ' lvl-err'
+                      : /\b(WRN|WARN)\b/.test(line)
+                        ? ' lvl-warn'
+                        : /\b(INF|INFO)\b/.test(line)
+                          ? ' lvl-info'
+                          : ''
+                      }`}
+                  >
+                    {line}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

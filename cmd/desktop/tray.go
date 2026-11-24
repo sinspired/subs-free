@@ -162,7 +162,7 @@ func buildTrayMenu(
 
 	menu.AddSeparator()
 
-	toggleWinItem := menu.Add("打开登录窗口")
+	toggleWinItem := menu.Add("打开主界面")
 	toggleWinItem.OnClick(func(_ *application.Context) {
 		guiApp.ToggleFromTray()
 	})
@@ -172,16 +172,20 @@ func buildTrayMenu(
 		guiApp.HideToTray()
 	})
 
-	backLoginItem := menu.Add("返回登录窗口")
-	backLoginItem.OnClick(func(_ *application.Context) {
-		guiApp.BackToLogin()
+	backMainItem := menu.Add("返回主界面")
+	backMainItem.OnClick(func(_ *application.Context) {
+		guiApp.BackToMain()
+		sendOSNotification("Subs Free", "已返回主界面")
 	})
 
-	// 同步托盘菜单语义（仅在状态变化时调用 menu.Update()，避免无谓重建 Windows 菜单）
+		// 同步托盘菜单语义（仅在状态变化时调用 menu.Update()，避免无谓重建 Windows 菜单）
 	var lastMenuKey string
 	syncTrayMenu := func() {
 		st := guiApp.GetTrayWindowState()
-		key := fmt.Sprintf("%s:%v:%v", st.Mode, st.IsVisible, guiApp.autostartCached.Load())
+		autostartOn := guiApp.autostartCached.Load()
+		silentOn := guiApp.GetSilentAutoStartEnabled()
+
+		key := fmt.Sprintf("%s:%v:%v:%v", st.Mode, st.IsVisible, autostartOn, silentOn)
 		if key == lastMenuKey {
 			return
 		}
@@ -189,21 +193,21 @@ func buildTrayMenu(
 
 		switch st.Mode {
 		case "background":
-			toggleWinItem.SetLabel("打开登录窗口")
+			toggleWinItem.SetLabel("打开主界面")
 			toggleWinItem.SetHidden(false)
 			bgRunItem.SetHidden(true)
-			backLoginItem.SetHidden(true)
+			backMainItem.SetHidden(true)
 
-		case "login":
+		case "main":
 			if st.IsVisible {
 				toggleWinItem.SetLabel("最小化到任务栏")
 			} else {
-				toggleWinItem.SetLabel("恢复登录窗口")
+				toggleWinItem.SetLabel("恢复主界面")
 			}
 			toggleWinItem.SetHidden(false)
 			bgRunItem.SetLabel("后台运行（关闭界面）")
 			bgRunItem.SetHidden(false)
-			backLoginItem.SetHidden(true)
+			backMainItem.SetHidden(true)
 
 		case "webui":
 			if st.IsVisible {
@@ -214,7 +218,7 @@ func buildTrayMenu(
 			toggleWinItem.SetHidden(false)
 			bgRunItem.SetLabel("后台运行（释放界面）")
 			bgRunItem.SetHidden(false)
-			backLoginItem.SetHidden(false)
+			backMainItem.SetHidden(false)
 		}
 
 		menu.Update()

@@ -5,18 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	coreapp "github.com/sinspired/subs-check-pro/v3/app"
-	"github.com/sinspired/subs-check-pro/v3/config"
-	"github.com/sinspired/subs-check-pro/v3/utils"
-	"github.com/sinspired/subs-free/updater"
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
-	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
-	ghprovider "github.com/wailsapp/wails/v3/pkg/updater/providers/github"
-	"gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"net"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,9 +18,19 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	coreapp "github.com/sinspired/subs-check-pro/v3/app"
+	"github.com/sinspired/subs-check-pro/v3/config"
+	"github.com/sinspired/subs-check-pro/v3/utils"
+	"github.com/sinspired/subs-free/updater"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
+	wupdater "github.com/wailsapp/wails/v3/pkg/updater"
+	ghprovider "github.com/wailsapp/wails/v3/pkg/updater/providers/github"
+	"gopkg.in/yaml.v3"
 )
 
-// globalGuiApp 包级指针，供 router handler（如 handleGuiBackToLogin）访问。
+// globalGuiApp 包级指针，供 router handler（如 handleGuiBackToMain）访问。
 var globalGuiApp *GuiApp
 
 // GuiApp Wails 绑定结构体。
@@ -36,15 +38,18 @@ type GuiApp struct {
 	configPath string
 	backend    *coreapp.App
 
-	// loginWin 登录小窗（按需创建；进入 WebUI / 最小化 / 收进托盘时销毁）。
-	loginWin *application.WebviewWindow
-	// webUIWin WebUI 大窗（进入管理界面时按需创建；点击 × 关闭销毁并回登录窗，最小化则隐藏进托盘保留状态）。
+	// mainWin App 主界面窗口（按需创建；进入管理面板 / 收进托盘时销毁）。
+	mainWin *application.WebviewWindow
+	// webUIWin WebUI 管理面板大窗（按需创建；关闭时销毁并回到主界面，最小化则隐藏进托盘）。
 	webUIWin *application.WebviewWindow
 
-	// loginClosing 为 true 时放行登录窗直接销毁（不弹出退出确认框）。
-	loginClosing atomic.Bool
-	// webUISilentClose 为 true 时表示代码主动关闭 WebUI（如 BackToLogin / HideToTray），不重复触发再打开登录窗。
+	// mainClosing 为 true 时放行主界面直接销毁（不弹出退出确认框）。
+	mainClosing atomic.Bool
+	// webUISilentClose 为 true 时表示代码主动关闭 WebUI（如 BackToMain / HideToTray），不重复打开主界面。
 	webUISilentClose atomic.Bool
+
+	// keyManualOverride 标记本次运行期间用户已手动修改过 API Key，立即消除随机密钥告警。
+	keyManualOverride atomic.Bool
 
 	// pendingInit 为 true 时表示端口预检发现冲突，Initialize() 尚未调用。
 	pendingInit bool
@@ -71,9 +76,10 @@ type GuiApp struct {
 	// checkingUpdate 防止用户连续快速点击"检查更新"图标
 	checkingUpdate atomic.Bool
 
-	// onTraySync 由 tray.go 注入，用于在窗口状态变更时立即刷新托盘菜单语义
+	// onTraySync 由 tray.go 注入，用于在窗口或自启状态变化时刷新托盘菜单语义。
 	onTraySync func()
 
+	// autostartCached 缓存开机自启状态，供托盘菜单快速比对刷新。
 	autostartCached atomic.Bool
 }
 
@@ -132,8 +138,8 @@ func getLocalIPv4s() []string {
 	return ips
 }
 
-// createLoginWindow 在主线程创建或聚焦登录小窗。
-func (g *GuiApp) createLoginWindow() {
+// createMainWindow 在主线程创建或聚焦 App 主界面窗口。
+func (g *GuiApp) createMainWindow() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
 		wailsApp = g.updaterApp
@@ -142,12 +148,12 @@ func (g *GuiApp) createLoginWindow() {
 		return
 	}
 
-	if g.loginWin != nil {
-		if g.loginWin.IsMinimised() {
-			g.loginWin.UnMinimise()
+	if g.mainWin != nil {
+		if g.mainWin.IsMinimised() {
+			g.mainWin.UnMinimise()
 		}
-		g.loginWin.Show()
-		g.loginWin.Focus()
+		g.mainWin.Show()
+		g.mainWin.Focus()
 		windowVisible.Store(true)
 		if g.onTraySync != nil {
 			g.onTraySync()
@@ -156,14 +162,14 @@ func (g *GuiApp) createLoginWindow() {
 	}
 
 	win := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:          "login",
+		Name:          "main",
 		Title:         "Subs Free",
-		Width:         560,
-		Height:        400,
-		MinWidth:      540,
+		Width:         580,
+		Height:        416,
+		MinWidth:      560,
 		MaxWidth:      600,
-		MinHeight:     380,
-		MaxHeight:     420,
+		MinHeight:     400,
+		MaxHeight:     426,
 		DisableResize: false,
 		Frameless:     false,
 		AlwaysOnTop:   false,
@@ -184,13 +190,13 @@ func (g *GuiApp) createLoginWindow() {
 		BackgroundType: application.BackgroundTypeTranslucent,
 	})
 
-	g.loginWin = win
+	g.mainWin = win
 	windowVisible.Store(true)
 
-	// 点击登录窗口 ×：拦截并弹出 QuitDialog，由用户选择「退出」或「后台运行」
+	// 点击主界面 ×：拦截并弹出 QuitDialog，由用户选择「退出」或「后台运行」
 	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		if g.loginClosing.CompareAndSwap(true, false) {
-			g.loginWin = nil
+		if g.mainClosing.CompareAndSwap(true, false) {
+			g.mainWin = nil
 			if g.webUIWin == nil || !g.webUIWin.IsVisible() {
 				windowVisible.Store(false)
 			}
@@ -203,7 +209,7 @@ func (g *GuiApp) createLoginWindow() {
 		win.EmitEvent("window:close-requested", nil)
 	})
 
-	// 保留登录窗口原生最小化到任务栏，仅同步托盘菜单文案
+	// 保留主界面原生最小化到任务栏，仅同步托盘菜单状态
 	win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
 		windowVisible.Store(false)
 		if g.onTraySync != nil {
@@ -240,27 +246,27 @@ func (g *GuiApp) createLoginWindow() {
 	}
 }
 
-// openLoginWindow 从任意 goroutine 安全唤起登录窗口。
-func (g *GuiApp) openLoginWindow() {
-	application.InvokeAsync(g.createLoginWindow)
+// openMainWindow 从任意 goroutine 安全唤起 App 主界面窗口。
+func (g *GuiApp) openMainWindow() {
+	application.InvokeAsync(g.createMainWindow)
 }
 
-// closeLoginWindow 主动销毁登录窗口（不触发 QuitDialog）。
-func (g *GuiApp) closeLoginWindow() {
+// closeMainWindow 主动销毁主界面窗口（不弹出退出确认框）。
+func (g *GuiApp) closeMainWindow() {
 	application.InvokeAsync(func() {
-		if g.loginWin == nil {
+		if g.mainWin == nil {
 			return
 		}
-		g.loginClosing.Store(true)
-		g.loginWin.Close()
+		g.mainClosing.Store(true)
+		g.mainWin.Close()
 	})
 }
 
-// NotifyAutostartChanged 安全同步开机自启状态到登录窗。
+// NotifyAutostartChanged 安全向主界面同步开机自启 / 静默自启状态变化事件。
 func (g *GuiApp) NotifyAutostartChanged(enabled bool) {
 	application.InvokeAsync(func() {
-		if g.loginWin != nil {
-			g.loginWin.EmitEvent("autostart:changed", enabled)
+		if g.mainWin != nil {
+			g.mainWin.EmitEvent("autostart:changed", enabled)
 		}
 	})
 }
@@ -294,7 +300,7 @@ func (g *GuiApp) OpenBrandURL(url string, windowSize string) {
 	})
 }
 
-// EnterWebUI 由前端调用：按需创建并进入 WebUI 大窗，同时销毁登录小窗。
+// EnterWebUI 由前端调用：按需创建本地 WebUI 管理面板大窗，同时销毁主界面窗口省内存。
 func (g *GuiApp) EnterWebUI() {
 	wailsApp := application.Get()
 	if wailsApp == nil {
@@ -346,11 +352,11 @@ func (g *GuiApp) EnterWebUI() {
 			g.webUIWin = win
 			windowVisible.Store(true)
 
-			// 1. WebUI 点击关闭 ×：直接销毁 WebUI 窗口释放 WebView2 进程，并回到登录窗口
+			// WebUI 关闭 ×：直接销毁管理面板释放 WebView2 进程，并回到 App 主界面
 			win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 				g.webUIWin = nil
 				g.inWebUI.Store(false)
-				if g.loginWin == nil {
+				if g.mainWin == nil {
 					windowVisible.Store(false)
 				}
 				if g.onTraySync != nil {
@@ -359,19 +365,18 @@ func (g *GuiApp) EnterWebUI() {
 				if g.webUISilentClose.CompareAndSwap(true, false) {
 					return
 				}
-				g.openLoginWindow()
+				g.openMainWindow()
 			})
 
-			// 2. WebUI 点击最小化 _：隐藏收进托盘并暂停前端轮询/动画，保留原窗口状态
+			// WebUI 最小化 _：隐藏收进托盘并暂停前端轮询，保留原窗口状态
 			win.OnWindowEvent(events.Common.WindowMinimise, func(e *application.WindowEvent) {
 				hideWindow(win)
-				sendOSNotification("Subs Check PRO", "管理界面已最小化到系统托盘，点击托盘图标可恢复")
+				sendOSNotification("Subs Free", "管理面板已最小化到系统托盘，点击托盘图标可恢复")
 				if g.onTraySync != nil {
 					g.onTraySync()
 				}
 			})
 
-			// 同步隐藏/显示状态给前端与托盘，确保最小化到托盘期间零后台轮询
 			win.OnWindowEvent(events.Common.WindowHide, func(e *application.WindowEvent) {
 				windowVisible.Store(false)
 				win.EmitEvent("webui:visibility", false)
@@ -406,10 +411,10 @@ func (g *GuiApp) EnterWebUI() {
 			win.Focus()
 		}
 
-		// 进入管理界面后销毁登录小窗，避免额外常驻一个 WebView2 进程
-		if g.loginWin != nil {
-			g.loginClosing.Store(true)
-			g.loginWin.Close()
+		// 进入管理界面后销毁主界面窗口，避免同时常驻两个 WebView2 进程
+		if g.mainWin != nil {
+			g.mainClosing.Store(true)
+			g.mainWin.Close()
 		}
 
 		if g.onTraySync != nil {
@@ -442,10 +447,10 @@ func (g *GuiApp) GetConfigPath() string {
 	return g.configPath
 }
 
-// BackToLogin 从 WebUI 返回登录窗口（销毁 WebUI 进程并打开登录窗口）
-func (g *GuiApp) BackToLogin() {
+// BackToMain 从管理面板返回 App 主界面（销毁 WebUI 进程并重新打开主界面）
+func (g *GuiApp) BackToMain() {
 	g.inWebUI.Store(false)
-	g.openLoginWindow()
+	g.openMainWindow()
 	application.InvokeAsync(func() {
 		if g.webUIWin != nil {
 			g.webUISilentClose.Store(true)
@@ -481,7 +486,7 @@ func (g *GuiApp) GetAppInfo() AppInfo {
 		ListenPort:           port,
 		SubStorePort:         subStorePort,
 		SubStorePath:         subStorePath,
-		KeyIsRandom:          os.Getenv("GUI_KEY_IS_RANDOM") == "1",
+		KeyIsRandom:          !g.keyManualOverride.Load() && os.Getenv("GUI_KEY_IS_RANDOM") == "1",
 		IsFirstRun:           g.isFirstRun,
 		ConfigPath:           g.configPath,
 		PortConflictHTTP:     conflictHTTP,
@@ -524,7 +529,7 @@ func (g *GuiApp) CompleteInit() error {
 	g.configPath = g.backend.GetConfigPath()
 	g.pendingInit = false
 
-	sendOSNotification("Subs Check PRO", "内核服务已成功启动")
+	sendOSNotification("Subs Free", "内核服务已成功启动")
 	return nil
 }
 
@@ -609,8 +614,9 @@ func (g *GuiApp) SwitchConfigFile(path, enteredKey string) (AppInfo, error) {
 	g.configPath = newBackend.GetConfigPath()
 	g.isFirstRun = false
 	g.pendingInit = false
+	g.keyManualOverride.Store(false)
 
-	sendOSNotification("Subs Check PRO", "内核已切换到新配置并重新启动")
+	sendOSNotification("Subs Free", "内核已切换到新配置并重新启动")
 	return g.GetAppInfo(), nil
 }
 
@@ -643,15 +649,15 @@ func (g *GuiApp) SetPorts(httpPort, subStorePort string) error {
 	return g.backend.SetPorts(httpPort, subStorePort)
 }
 
-// ShowWindow 供前端主动调用，显示并聚焦登录窗口。
+// ShowWindow 供前端主动调用，显示并聚焦主界面窗口。
 func (g *GuiApp) ShowWindow() {
-	g.openLoginWindow()
+	g.openMainWindow()
 }
 
 // TrayWindowState 描述当前窗口与界面所处真实状态，供托盘菜单和单击切换使用。
 type TrayWindowState struct {
-	Mode      string // "background" | "login" | "webui"
-	IsVisible bool   // 窗口当前是否可见且未最小化
+	Mode      string // "background" | "main" | "webui"
+	IsVisible bool
 }
 
 // GetTrayWindowState 必须在主线程调用，返回真实窗口状态。
@@ -660,9 +666,9 @@ func (g *GuiApp) GetTrayWindowState() TrayWindowState {
 		vis := g.webUIWin.IsVisible() && !g.webUIWin.IsMinimised()
 		return TrayWindowState{Mode: "webui", IsVisible: vis}
 	}
-	if g.loginWin != nil {
-		vis := g.loginWin.IsVisible() && !g.loginWin.IsMinimised()
-		return TrayWindowState{Mode: "login", IsVisible: vis}
+	if g.mainWin != nil {
+		vis := g.mainWin.IsVisible() && !g.mainWin.IsMinimised()
+		return TrayWindowState{Mode: "main", IsVisible: vis}
 	}
 	return TrayWindowState{Mode: "background", IsVisible: false}
 }
@@ -680,20 +686,20 @@ func (g *GuiApp) ToggleFromTray() {
 			} else {
 				showWindow(g.webUIWin)
 			}
-		case "login":
+		case "main":
 			if st.IsVisible {
-				g.loginWin.Minimise()
+				g.mainWin.Minimise()
 			} else {
-				if g.loginWin.IsMinimised() {
-					g.loginWin.UnMinimise()
+				if g.mainWin.IsMinimised() {
+					g.mainWin.UnMinimise()
 				}
-				g.loginWin.Show()
-				g.loginWin.Focus()
+				g.mainWin.Show()
+				g.mainWin.Focus()
 				windowVisible.Store(true)
 			}
 		default: // "background"
 			g.inWebUI.Store(false)
-			g.createLoginWindow()
+			g.createMainWindow()
 		}
 
 		if g.onTraySync != nil {
@@ -710,25 +716,25 @@ func (g *GuiApp) HideToTray() {
 			g.webUISilentClose.Store(true)
 			g.webUIWin.Close()
 		}
-		if g.loginWin != nil {
-			g.loginClosing.Store(true)
-			g.loginWin.Close()
+		if g.mainWin != nil {
+			g.mainClosing.Store(true)
+			g.mainWin.Close()
 		}
 		if g.onTraySync != nil {
 			g.onTraySync()
 		}
 	})
-	sendOSNotification("Subs Check PRO", "已关闭界面窗口，核心服务在后台持续运行\n点击系统托盘图标可重新打开")
+	sendOSNotification("Subs Free", "已关闭界面窗口，核心服务在后台持续运行\n点击系统托盘图标可重新打开")
 }
 
-// showActiveWindow 恢复/唤起当前主窗口（WebUI 最小化进托盘则恢复原 WebUI，否则打开登录窗口）。
+// showActiveWindow 从托盘/二次启动恢复窗口：WebUI 最小化进托盘则恢复原 WebUI，否则打开主界面。
 func (g *GuiApp) showActiveWindow() {
 	application.InvokeAsync(func() {
 		if g.inWebUI.Load() && g.webUIWin != nil {
 			showWindow(g.webUIWin)
 		} else {
 			g.inWebUI.Store(false)
-			g.createLoginWindow()
+			g.createMainWindow()
 		}
 		if g.onTraySync != nil {
 			g.onTraySync()
@@ -736,14 +742,14 @@ func (g *GuiApp) showActiveWindow() {
 	})
 }
 
-// hideActiveWindow 将当前活动窗口收进托盘：WebUI 保留状态并休眠前端；登录窗直接销毁。
+// hideActiveWindow 将当前活动窗口收进托盘：WebUI 保留状态并休眠前端；主界面直接销毁。
 func (g *GuiApp) hideActiveWindow() {
 	application.InvokeAsync(func() {
 		if g.inWebUI.Load() && g.webUIWin != nil {
 			hideWindow(g.webUIWin)
-		} else if g.loginWin != nil {
-			g.loginClosing.Store(true)
-			g.loginWin.Close()
+		} else if g.mainWin != nil {
+			g.mainClosing.Store(true)
+			g.mainWin.Close()
 		}
 		if g.onTraySync != nil {
 			g.onTraySync()
@@ -753,7 +759,7 @@ func (g *GuiApp) hideActiveWindow() {
 
 // QuitApp 供前端"关闭确认对话框"选择退出时调用。
 func (g *GuiApp) QuitApp() {
-	sendOSNotification("Subs Check PRO", "GUI正在关闭…")
+	sendOSNotification("Subs Free", "应用正在关闭…")
 	app := application.Get()
 	if app != nil {
 		app.Quit()
@@ -827,14 +833,12 @@ func isPortInUse(port string) bool {
 	return false
 }
 
-// ── 开机自启辅助方法 ──────────────────────────────────────────────────────────
+// ── GUI 偏好持久化 & 开机自启 ──────────────────────────────────────────────
 
-// GetAutoStartEnabled 查询当前开机自启状态（供托盘菜单调用）。
+// GetAutoStartEnabled 查询当前开机自启状态。
 func (g *GuiApp) GetAutoStartEnabled() (bool, error) {
 	return g.autostart.IsEnabled()
 }
-
-// ── GUI 偏好持久化（仅存轻量的自启偏好）──────────────────────────────────────
 
 type guiPrefs struct {
 	SilentAutostart   bool   `json:"silentAutostart"`
@@ -873,16 +877,29 @@ func saveGuiPrefs(p guiPrefs) error {
 }
 
 func (g *GuiApp) applyAutostart(enabled, silent bool) error {
+	// 先清理旧注册项，防止与不带 --hidden 的历史条目并存
+	if err := g.autostart.Disable(); err != nil {
+		slog.Debug("清理旧自启注册项失败（可忽略）", "error", err)
+	}
 	if !enabled {
-		return g.autostart.Disable()
+		return nil
+	}
+
+	opts := application.AutostartOptions{
+		Identifier: "com.sinspired.subs-free",
 	}
 	if silent {
-		// 使用 Wails v3 EnableWithOptions 注入 --hidden 启动参数
-		return g.autostart.EnableWithOptions(application.AutostartOptions{
-			Arguments: []string{"--hidden"},
-		})
+		opts.Arguments = []string{"--hidden"}
 	}
-	return g.autostart.Enable()
+
+	if err := g.autostart.EnableWithOptions(opts); err != nil {
+		return err
+	}
+
+	if st, err := g.autostart.Status(); err == nil {
+		slog.Info("开机自启配置已更新", "enabled", st.Enabled, "strategy", st.Strategy, "path", st.Path, "silent", silent)
+	}
+	return nil
 }
 
 // GetSilentAutoStartEnabled 读取是否开启「静默自启」。
@@ -942,10 +959,12 @@ func (g *GuiApp) SetAutoStart(enabled bool) error {
 	return nil
 }
 
-// SetAutoStartEnabled 保留兼容旧调用。
+// SetAutoStartEnabled 保留兼容调用。
 func (g *GuiApp) SetAutoStartEnabled(enable bool) error {
 	return g.SetAutoStart(enable)
 }
+
+// ── 子窗口与内置页面 ──────────────────────────────────────────────────────────
 
 // OpenInternalPage 在新窗口中打开内置 Web 页面（如 /files、/analysis）。
 func (g *GuiApp) OpenInternalPage(path string, title string, windowSize string) {
@@ -1039,7 +1058,7 @@ func (g *GuiApp) CheckForUpdates() {
 		updateInfo, err := g.updaterApp.Updater.Check(ctx)
 		if err != nil {
 			slog.Warn("检查更新失败", "error", err)
-			sendOSNotification("Subs Check PRO GUI 更新失败", err.Error())
+			sendOSNotification("Subs Free 更新失败", err.Error())
 			g.updaterApp.Event.Emit("gui:update:toast", "检查更新失败: "+err.Error())
 			return
 		}
@@ -1116,7 +1135,7 @@ func (g *GuiApp) showUpdateWindow(rel *wupdater.Release) {
 			go func() {
 				if err := g.updaterApp.Updater.Restart(ctx); err != nil {
 					slog.Warn("重启应用更新失败", "error", err)
-					sendOSNotification("Subs Check PRO GUI 更新失败", err.Error())
+					sendOSNotification("Subs Free 更新失败", err.Error())
 				}
 			}()
 		})
@@ -1448,16 +1467,38 @@ func (g *GuiApp) GetUpdateStatus() updater.UpdateStatus {
 	return updater.GetUpdateStatus()
 }
 
-// CheckState 前端展示检测进度所需的状态信息
+// CheckState 前端展示检测进度与下次计划所需的状态信息
 type CheckState struct {
-	IsChecking bool   `json:"isChecking"`
-	StepName   string `json:"stepName"`
-	Progress   int64  `json:"progress"`
-	ProxyCount int64  `json:"proxyCount"`
-	LastResult string `json:"lastResult"`
+	IsChecking    bool   `json:"isChecking"`
+	StepName      string `json:"stepName"`
+	Available     int64  `json:"available"`
+	Progress      int64  `json:"progress"`
+	ProxyCount    int64  `json:"proxyCount"`
+	LastResult    string `json:"lastResult"`
+	NextCheckTime string `json:"nextCheckTime"`
+	NextCheckUnix int64  `json:"nextCheckUnix"`
+	ScheduleMode  string `json:"scheduleMode"`
 }
 
-// GetCheckState 返回当前后端的检测进度状态，供灵动岛等前端页面调用
+func formatDesktopNextCheckLabel(t time.Time) string {
+	local := t.Local()
+	now := time.Now().Local()
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	targetDay := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+	diffDays := int(targetDay.Sub(today).Hours() / 24)
+
+	switch diffDays {
+	case 0:
+		return "今天 " + local.Format("15:04")
+	case 1:
+		return "明天 " + local.Format("15:04")
+	default:
+		return local.Format("01-02 15:04")
+	}
+}
+
+// GetCheckState 返回当前后端的检测进度与下次检测时间
 func (g *GuiApp) GetCheckState() CheckState {
 	if g.backend == nil || g.pendingInit {
 		return CheckState{
@@ -1466,15 +1507,26 @@ func (g *GuiApp) GetCheckState() CheckState {
 		}
 	}
 
-	isChecking := g.backend.IsChecking()
 	st := g.backend.GetCurrentState()
+	nextTime, mode := g.backend.GetNextCheckTime()
+
+	var nextStr string
+	var nextUnix int64
+	if !nextTime.IsZero() {
+		nextUnix = nextTime.Unix()
+		nextStr = formatDesktopNextCheckLabel(nextTime)
+	}
 
 	return CheckState{
-		IsChecking: isChecking,
-		StepName:   st.StepName,
-		Progress:   st.Progress,
-		ProxyCount: st.ProxyCount,
-		LastResult: g.backend.GetLastCheckResult(),
+		IsChecking:    g.backend.IsChecking(),
+		StepName:      st.StepName,
+		Available:     st.Available,
+		Progress:      st.Progress,
+		ProxyCount:    st.ProxyCount,
+		LastResult:    g.backend.GetLastCheckResult(),
+		NextCheckTime: nextStr,
+		NextCheckUnix: nextUnix,
+		ScheduleMode:  mode,
 	}
 }
 
@@ -1585,4 +1637,55 @@ func (g *GuiApp) SaveUpdaterSettings(token string, prerelease bool) (UpdaterSett
 		return UpdaterSettings{}, err
 	}
 	return g.GetUpdaterSettings(), nil
+}
+
+// MarkAPIKeyManual 标记本次运行期间已手动设置过 API Key，立刻消除随机密钥告警。
+func (g *GuiApp) MarkAPIKeyManual() {
+	g.keyManualOverride.Store(true)
+}
+
+// APIProxy 在进程内直调 Gin 路由，供桌面主界面无 CORS 地读写配置、启停检测、拉取报告与日志。
+func (g *GuiApp) APIProxy(method, path, body string) string {
+	type apiResult struct {
+		Status int    `json:"status"`
+		Body   string `json:"body"`
+	}
+	fail := func(status int, msg string) string {
+		b, _ := json.Marshal(apiResult{
+			Status: status,
+			Body:   fmt.Sprintf(`{"error":%q}`, msg),
+		})
+		return string(b)
+	}
+
+	if g.backend == nil || g.pendingInit {
+		return fail(503, "内核尚未就绪")
+	}
+
+	router := g.backend.GetRouter()
+	if router == nil {
+		if strings.EqualFold(method, "POST") && path == "/api/trigger-check" {
+			g.backend.TriggerCheck()
+			return `{"status":200,"body":"{\"message\":\"已触发检测\"}"}`
+		}
+		return fail(503, "路由器未初始化（请检查 listen-port）")
+	}
+
+	req := httptest.NewRequest(strings.ToUpper(method), path, strings.NewReader(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("X-API-Key", config.GlobalConfig.APIKey)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	result, err := json.Marshal(apiResult{
+		Status: rec.Code,
+		Body:   rec.Body.String(),
+	})
+	if err != nil {
+		return fail(500, "响应序列化失败")
+	}
+	return string(result)
 }
