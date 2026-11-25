@@ -735,7 +735,13 @@ export function App() {
   const [keySaving, setKeySaving] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+
   const keyInputRef = useRef<HTMLInputElement>(null);
+  const keySavingRef = useRef(false);
+  const wasKeyShownRef = useRef(false);
+  const copyTimerRef = useRef<number>();
+  const savedTimerRef = useRef<number>();
+
   const keyChanged = editingKey && keyDraft.trim() !== "" && keyDraft.trim() !== info?.apiKey;
 
   // 进入编辑模式后，等输入框真正挂载再聚焦并全选，避免手动 setTimeout 猜时序
@@ -746,24 +752,42 @@ export function App() {
     }
   }, [editingKey]);
 
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(copyTimerRef.current);
+      window.clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
   const startEditKey = () => {
-    if (!info || keySaving) return;
+    if (!info || keySavingRef.current) return;
+    wasKeyShownRef.current = keyShown;
     setKeyDraft(info.apiKey);
     setKeyShown(true); // 编辑时强制明文显示，方便核对
     setEditingKey(true);
   };
 
   const cancelEditKey = () => {
+    if (keySavingRef.current) return;
     setEditingKey(false);
     setKeyDraft(info?.apiKey || "");
-    setKeyShown(false); // 取消编辑时，强制恢复为隐藏（模糊）状态
+    setKeyShown(wasKeyShownRef.current);
   };
 
   const saveApiKey = async () => {
-    if (!info || keySaving) return;
+    if (!info || keySavingRef.current) return;
     const newKey = keyDraft.trim();
-    if (!newKey || newKey === info.apiKey) { setEditingKey(false); return; }
+    if (!newKey) {
+      showToast("API 密钥不能为空", "error");
+      keyInputRef.current?.focus();
+      return;
+    }
+    if (newKey === info.apiKey) {
+      cancelEditKey();
+      return;
+    }
 
+    keySavingRef.current = true;
     setKeySaving(true);
     try {
       // 1. 获取原汁原味的配置文件内容（原生桥接读取，避免网络层时序问题）
@@ -778,7 +802,10 @@ export function App() {
       if (!apiKeyLineRe.test(rawYaml)) {
         throw new Error("未在配置文件中找到 api-key 字段，请手动检查");
       }
-      const newYaml = rawYaml.replace(apiKeyLineRe, (_m: string, prefix: string, quote: string, _old: string, suffix: string) => `${prefix}${quote}${newKey}${quote}${suffix}`);
+      const newYaml = rawYaml.replace(
+        apiKeyLineRe,
+        (_m: string, prefix: string, quote: string, _old: string, suffix: string) => `${prefix}${quote}${newKey}${quote}${suffix}`
+      );
 
       if (newYaml === rawYaml) {
         throw new Error("api-key 未发生变化，已取消保存");
@@ -800,7 +827,7 @@ export function App() {
       // 3. 给内核重载配置的时间
       await new Promise(r => setTimeout(r, 600));
 
-      let verifyInfo: AppInfo | null;
+      let verifyInfo: AppInfo | null = null;
       try { verifyInfo = await GuiApp.GetAppInfo(); } catch (e) { }
 
       setInfo(prev => {
@@ -815,18 +842,21 @@ export function App() {
       setKeyShown(false);
       setEditingKey(false);
       setJustSaved(true);
-      setKeySaved(true)
-      setTimeout(() => setJustSaved(false), 900);
+      setKeySaved(true);
+      window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = window.setTimeout(() => setJustSaved(false), 900);
 
       showToast("API 密钥更新成功", "success");
     } catch (err) {
       showToast("更新失败: " + String(err), "error");
     } finally {
+      keySavingRef.current = false;
       setKeySaving(false);
     }
   };
 
   const onKeyEditIconClick = () => {
+    if (keySavingRef.current) return;
     triggerHaptic("selection");
     if (!editingKey) return startEditKey();
     if (keyChanged) return saveApiKey();
@@ -834,8 +864,19 @@ export function App() {
   };
 
   const onKeyInputKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); if (keyChanged) saveApiKey(); }
-    else if (e.key === "Escape") { e.preventDefault(); cancelEditKey(); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (keyChanged) {
+        saveApiKey();
+      } else if (keyDraft.trim() === "") {
+        showToast("API 密钥不能为空", "error");
+      } else {
+        cancelEditKey();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEditKey();
+    }
   };
 
   // 工具函数
@@ -894,10 +935,10 @@ export function App() {
       // 如果传入了 id，则触发短暂的状态变更
       if (id) {
         setCopiedId(id);
-        // 1秒后恢复原图标 (保护机制，防止没关弹窗的场景下一直卡在对号)
-        setTimeout(() => {
+        window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = window.setTimeout(() => {
           setCopiedId(current => current === id ? null : current);
-        }, 1000);
+        }, 1500);
       }
     } else {
       showToast(`复制失败，请尝试手动复制`, "error");
@@ -1156,36 +1197,44 @@ export function App() {
                     type={keyShown ? "text" : "password"}
                     inputmode="latin"
                     value={keyDraft}
-                    disabled={keySaving}
+                    readOnly={keySaving}
                     onInput={(e: any) => setKeyDraft(e.currentTarget.value)}
                     onKeyDown={onKeyInputKeyDown}
-                    onBlur={() => { cancelEditKey(); }}
+                    onBlur={() => {
+                      if (!keySavingRef.current) cancelEditKey();
+                    }}
                   />
                 ) : (
-                  <span class={`key-text ${keyShown ? "" : "blur"}`} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }}>{info?.apiKey}</span>
+                  <span
+                    class={`key-text ${keyShown ? "" : "blur"}`}
+                    onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }}
+                  >
+                    {info?.apiKey}
+                  </span>
                 )}
 
-                {/* 三个按钮位置始终固定；只有编辑/保存这一个按钮的图标随编辑状态变化 */}
                 <button
-                  class={`icon-btn ${keyChanged ? "btn-save-active" : ""}`}
+                  class={`icon-btn ${keyChanged ? "btn-save-active" : editingKey ? "btn-cancel-edit" : ""}`}
                   onMouseDown={(e: any) => e.preventDefault()}
                   onClick={onKeyEditIconClick}
                   disabled={keySaving}
-                  title={editingKey ? (keyChanged ? "保存" : "取消编辑") : "修改 API 密钥"}
+                  title={keySaving ? "正在保存…" : editingKey ? (keyChanged ? "保存" : "取消编辑") : "修改 API 密钥"}
                 >
                   {keySaving ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-loader"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                    <svg class="icon-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
                   ) : keyChanged ? (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                  ) : editingKey ? (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                   ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-3"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                   )}
                 </button>
 
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }} title="显示/隐藏">
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} disabled={keySaving} onClick={() => { triggerHaptic("selection"); setKeyShown(!keyShown); }} title="显示/隐藏">
                   {keyShown ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>}
                 </button>
-                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} onClick={() => { copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥", "apiKey"); }} title="复制">
+                <button class="icon-btn" onMouseDown={(e: any) => e.preventDefault()} disabled={keySaving} onClick={() => { copyText(editingKey ? keyDraft : info!.apiKey, "API 密钥", "apiKey"); }} title="复制">
                   {copiedId === "apiKey" ? (
                     <svg class="text-success icon-check-pop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   ) : (

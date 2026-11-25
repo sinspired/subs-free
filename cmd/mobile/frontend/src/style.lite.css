@@ -221,19 +221,41 @@ button, .icon-btn { min-height: 44px; min-width: 44px; cursor: pointer; }
 .info-groups-wrapper { display: flex; flex-direction: column; }
 .info-group { display: flex; flex-direction: column; flex-shrink: 0; }
 
-.key-wrap { display: flex; align-items: center; min-height: 36px; flex-shrink: 0; background: var(--code-bg);border: 1px solid var(--border-glass); border-radius: 14px; padding: 2px 2px 2px 12px; width: 100%; transition: background-color 0.3s; }
+.key-wrap { display: flex; align-items: center; min-height: 36px; flex-shrink: 0; background: var(--code-bg);border: 1px solid var(--border-glass); border-radius: 14px; padding: 2px 2px 2px 14px; width: 100%; transition: background-color 0.3s, border-color 0.2s ease, box-shadow 0.2s ease;}
 .key-text { flex: 1; font-family: monospace; font-size: 13px; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: filter 0.3s ease; transform: translateY(1px); }
 .key-text.blur { filter: blur(4px); opacity: 0.6; }
-.key-wrap .icon-btn { min-height: 32px; min-width: 32px; padding: 6px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: transparent; border: none; color: var(--text-sub); transition: background-color 0.2s; }
+.key-wrap .icon-btn { min-height: 32px; min-width: 32px; padding: 6px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: transparent; border: none; color: var(--text-sub); transition: background-color 0.2s, color 0.2s, transform 0.12s;}
+.key-wrap .icon-btn:active:not(:disabled) {
+  background: var(--code-bg);
+  transform: scale(0.92);
+}
 .key-wrap .icon-btn:active { background: var(--code-bg); }
 .key-wrap .icon-btn svg { width: 15px; height: 15px; }
-.key-wrap.editing { border-color: var(--primary); }
+.key-wrap.editing {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(14, 165, 160, 0.14);
+}
 .key-wrap.just-saved { animation: pulse-key-saved 0.9s ease-out; }
 .key-alert-pop { animation: pop-key-alert 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-.key-text-input { flex: 1; min-width: 0; width: 100%; height: 24px; -webkit-appearance: none; appearance: none; font-family: monospace; font-size: 13px; color: var(--text-main); background: transparent; border: none; outline: none; padding: 0; transform: translateY(1px); }
-.key-wrap .icon-btn.btn-save-active { color: var(--primary); }
-.key-wrap .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+@keyframes pulse-key-saved { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); } 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.key-text-input {
+  flex: 1; min-width: 0; width: 100%;
+  font-family: monospace; font-size: 13px; line-height: 1.5;
+  color: var(--text-main); background: transparent; border: none; outline: none; padding: 0;
+  transform: translateY(1px);
+}
+.key-wrap .icon-btn.btn-save-active {
+  color: var(--primary);
+  background: rgba(14, 165, 160, 0.12);
+}
+.key-wrap .icon-btn.btn-cancel-edit {
+  color: var(--text-main);
+}
+.key-wrap .icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .icon-spin { animation: spin 0.8s linear infinite; }
 
 .port-badges { display: flex; flex-wrap: wrap; margin-bottom: -8px;}

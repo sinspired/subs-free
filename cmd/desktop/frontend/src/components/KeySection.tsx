@@ -133,19 +133,26 @@ export function KeySection({
   const [launching, setLaunching] = useState(false);
   const [actionInFlight, setActionInFlight] = useState(false);
 
-  // API Key 行内编辑状态
+  // API Key 行内编辑与复制反馈状态
   const [editingKey, setEditingKey] = useState(false);
   const [keyDraft, setKeyDraft] = useState('');
   const [keySaving, setKeySaving] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
+
   const keyInputRef = useRef<HTMLInputElement>(null);
+  const keySavingRef = useRef(false);
+  const wasKeyShownRef = useRef(false);
+  const copyTimerRef = useRef<number | undefined>(undefined);
+  const savedTimerRef = useRef<number | undefined>(undefined);
 
   const { spanRef: pathRef, display: pathDisplay } = useTruncatedPath(
     info.configPath || '',
   );
 
   const currentKey = info.apiKey;
-  const keyChanged = editingKey && keyDraft.trim() !== '' && keyDraft.trim() !== currentKey;
+  const trimmedDraft = keyDraft.trim();
+  const keyChanged = editingKey && trimmedDraft !== '' && trimmedDraft !== currentKey;
   const isChecking = !!status?.isChecking;
   const progressPercent = status?.proxyCount
     ? Math.min(100, (status.progress / status.proxyCount) * 100)
@@ -158,6 +165,14 @@ export function KeySection({
     }
   }, [editingKey]);
 
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(copyTimerRef.current);
+      window.clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
   const toggleKey = () => {
     if (editingKey) return;
     setKeyShown(v => !v);
@@ -165,35 +180,78 @@ export function KeySection({
 
   async function copyKey() {
     const val = editingKey ? keyDraft : currentKey;
-    try {
-      await navigator.clipboard.writeText(val);
-      toast('已复制密钥');
-    } catch {
+    if (!val) {
+      toast('密钥为空');
+      return;
+    }
+
+    let success = false;
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(val);
+        success = true;
+      } catch {
+        // 降级到传统方式
+      }
+    }
+
+    if (!success) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = val;
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch {
+        success = false;
+      }
+    }
+
+    if (success) {
+      setKeyCopied(true);
+      window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => setKeyCopied(false), 1500);
+      toast('已复制 API 密钥');
+    } else {
       toast('复制失败，请手动复制');
     }
   }
 
   function startEditKey() {
-    if (keySaving) return;
+    if (keySavingRef.current) return;
+    wasKeyShownRef.current = keyShown;
     setKeyDraft(currentKey);
-    setKeyShown(true);
+    setKeyShown(true); // 编辑时强制明文，便于核对
     setEditingKey(true);
   }
 
   function cancelEditKey() {
+    if (keySavingRef.current) return;
     setEditingKey(false);
     setKeyDraft(currentKey);
-    setKeyShown(false);
+    setKeyShown(wasKeyShownRef.current);
   }
 
   async function saveApiKey() {
-    if (keySaving) return;
+    if (keySavingRef.current) return;
     const newKey = keyDraft.trim();
-    if (!newKey || newKey === currentKey) {
+    if (!newKey) {
+      toast('API 密钥不能为空');
+      keyInputRef.current?.focus();
+      return;
+    }
+    if (newKey === currentKey) {
       cancelEditKey();
       return;
     }
 
+    keySavingRef.current = true;
     setKeySaving(true);
     try {
       const rawRes = await GuiApp.APIProxy('GET', '/api/config', '');
@@ -231,16 +289,19 @@ export function KeySection({
       setEditingKey(false);
       setKeyShown(false);
       setKeySaved(true);
-      setTimeout(() => setKeySaved(false), 1200);
+      window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = window.setTimeout(() => setKeySaved(false), 900);
       toast('API 密钥已更新');
     } catch (e: any) {
       toast('密钥更新失败: ' + (e?.message ?? String(e)));
     } finally {
+      keySavingRef.current = false;
       setKeySaving(false);
     }
   }
 
   function onKeyEditIconClick() {
+    if (keySavingRef.current) return;
     if (!editingKey) return startEditKey();
     if (keyChanged) return saveApiKey();
     cancelEditKey();
@@ -249,7 +310,13 @@ export function KeySection({
   function onKeyInputKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (keyChanged) saveApiKey();
+      if (keyChanged) {
+        saveApiKey();
+      } else if (keyDraft.trim() === '') {
+        toast('API 密钥不能为空');
+      } else {
+        cancelEditKey();
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       cancelEditKey();
@@ -370,10 +437,12 @@ export function KeySection({
               class="key-text key-text-input"
               type={keyShown ? 'text' : 'password'}
               value={keyDraft}
-              disabled={keySaving}
+              readOnly={keySaving}
               onInput={e => setKeyDraft((e.target as HTMLInputElement).value)}
               onKeyDown={onKeyInputKeyDown}
-              onBlur={cancelEditKey}
+              onBlur={() => {
+                if (!keySavingRef.current) cancelEditKey();
+              }}
             />
           ) : (
             <span
@@ -385,19 +454,44 @@ export function KeySection({
             </span>
           )}
 
+          {/* 编辑 / 取消 / 保存 / 保存中 四态按钮 */}
           <button
-            class={`icon-btn${keyChanged ? ' btn-save-active' : ''}`}
+            class={`icon-btn${keyChanged ? ' btn-save-active' : editingKey ? ' btn-cancel-edit' : ''}`}
             onMouseDown={e => e.preventDefault()}
             onClick={onKeyEditIconClick}
             disabled={keySaving}
-            title={editingKey ? (keyChanged ? '保存密钥' : '取消编辑') : '修改 API 密钥'}
+            title={
+              keySaving
+                ? '正在保存…'
+                : editingKey
+                  ? (keyChanged ? '保存密钥 (Enter)' : '取消编辑 (Esc)')
+                  : '修改 API 密钥'
+            }
           >
-            {keyChanged ? (
+            {keySaving ? (
+              <svg class="icon-spin" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="2" x2="12" y2="6" />
+                <line x1="12" y1="18" x2="12" y2="22" />
+                <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
+                <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+                <line x1="2" y1="12" x2="6" y2="12" />
+                <line x1="18" y1="12" x2="22" y2="12" />
+                <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
+                <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+              </svg>
+            ) : keyChanged ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
+              </svg>
+            ) : editingKey ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             ) : (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -408,11 +502,13 @@ export function KeySection({
             )}
           </button>
 
+          {/* 显示/隐藏 */}
           <button
             class="icon-btn"
             onMouseDown={e => e.preventDefault()}
             onClick={() => setKeyShown(v => !v)}
-            title="显示/隐藏"
+            disabled={keySaving}
+            title={keyShown ? '隐藏密钥' : '显示密钥'}
           >
             {!keyShown ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -432,17 +528,26 @@ export function KeySection({
             )}
           </button>
 
+          {/* 复制密钥（带对号成功动效） */}
           <button
-            class="icon-btn"
+            class={`icon-btn${keyCopied ? ' ok' : ''}`}
             onMouseDown={e => e.preventDefault()}
             onClick={copyKey}
-            title="复制密钥"
+            disabled={keySaving}
+            title={keyCopied ? '已复制' : '复制密钥'}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+            {keyCopied ? (
+              <svg class="icon-check-pop" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
           </button>
         </div>
 
