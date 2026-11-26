@@ -52,7 +52,7 @@ export function QuitDialog({ onClose }: Props) {
               </div>
 
               <div class="quit-btn-sub">
-                后台继续运行检测任务
+                在系统托盘以内核后台运行，定时检测
               </div>
             </div>
           </button>

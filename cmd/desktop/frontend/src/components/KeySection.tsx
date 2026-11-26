@@ -751,7 +751,7 @@ export function KeySection({
           </div>
         ) : (
           <div class="desk-pipe-empty">
-            {status?.lastResult || '尚无检测记录 · 点击左侧开始按钮即可检测'}
+            {status?.lastResult || '内核就绪，等你开始'}
           </div>
         )}
       </div>
