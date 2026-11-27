@@ -9,7 +9,7 @@ require (
 	github.com/metacubex/mihomo v1.19.34
 	github.com/metacubex/utls v1.9.0-alpha.1
 	github.com/sinspired/subs-check-pro-webui v1.8.6
-	github.com/sinspired/subs-check-pro/v3 v3.6.2
+	github.com/sinspired/subs-check-pro/v3 v3.6.3
 	github.com/wailsapp/wails/v3 v3.1.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -44,7 +44,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dunglas/httpsfv v1.1.2 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/easytier/easytier/easytier-go v0.0.0-20261124122858-c97f36b8d40f // indirect
+	github.com/easytier/easytier/easytier-go v0.0.0-20261126155835-36ba7fb01e20 // indirect
 	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/enfein/mieru/v3 v3.40.0 // indirect
 	github.com/ericlagergren/aegis v0.0.0-20250325060835-cd0defd64358 // indirect

@@ -64,8 +64,8 @@ github.com/dunglas/httpsfv v1.1.2 h1:432E+FKy2DLMbVcZeAnOuM7nhyJ4vTiH7b9iXJ/Dkmc
 github.com/dunglas/httpsfv v1.1.2/go.mod h1:zID2mqw9mFsnt7YC3vYQ9/cjq30q41W+1AnDwH8TiMg=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
-github.com/easytier/easytier/easytier-go v0.0.0-20261124122858-c97f36b8d40f h1:2H5zaxxqp2Edc2RkFriCI9h7aF4wjyhiGqYg1wLlnJg=
-github.com/easytier/easytier/easytier-go v0.0.0-20261124122858-c97f36b8d40f/go.mod h1:fCEi5+K2yt+sPDONSWO1uNpOifrwPgFGvm3J0YrFRvk=
+github.com/easytier/easytier/easytier-go v0.0.0-20261126155835-36ba7fb01e20 h1:8lhbt5u2z1UGJb97ieK5+HXi40y3F477S0NFKGmzMYo=
+github.com/easytier/easytier/easytier-go v0.0.0-20261126155835-36ba7fb01e20/go.mod h1:fCEi5+K2yt+sPDONSWO1uNpOifrwPgFGvm3J0YrFRvk=
 github.com/ebitengine/purego v0.11.3 h1:OB+JLpdm7ioymhyA+6s5kbb/uOuYycAgL8NNTFc5MLg=
 github.com/ebitengine/purego v0.11.3/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
 github.com/enfein/mieru/v3 v3.40.0 h1:J4M+g7YWi4eU2rYKPvEE3IdY8VB8Kw4xuybLCf+h6PU=
@@ -358,8 +358,8 @@ github.com/sinspired/checkip v0.5.6 h1:eJG0GQZdwpwCg1nnKAH4FeYSWwIiI+DIJGWZ/HOQB
 github.com/sinspired/checkip v0.5.6/go.mod h1:bLaDeobpiwXZ2J5wXekSnpDBLv7J5LOLxnzJ4A1grrM=
 github.com/sinspired/subs-check-pro-webui v1.8.6 h1:T7TYrSpekMegNqvnTNOqOGlT2ejf8jO4mZjDgvFFmew=
 github.com/sinspired/subs-check-pro-webui v1.8.6/go.mod h1:rg8DBZnTSh5/5tHCwQJrMVX6tKqqI5m8BrTT+gCB92M=
-github.com/sinspired/subs-check-pro/v3 v3.6.2 h1:UYXLXZj7m+X2JnwODn5H8rFvjEVxk1NHEmpzBGKz4FU=
-github.com/sinspired/subs-check-pro/v3 v3.6.2/go.mod h1:zAt4ODDFhDri1TozuuuqLkI2li0/I27eq/BFVGsZemg=
+github.com/sinspired/subs-check-pro/v3 v3.6.3 h1:YakSDy8jI8blGBNa5aNzcoQV5+jVHHQnHwJ2vSar7m8=
+github.com/sinspired/subs-check-pro/v3 v3.6.3/go.mod h1:zAt4ODDFhDri1TozuuuqLkI2li0/I27eq/BFVGsZemg=
 github.com/sirupsen/logrus v1.10.2 h1:G2SED73/qrAu6YwbdxOD6peLkCBI3z7L+ykJFTXJBBo=
 github.com/sirupsen/logrus v1.10.2/go.mod h1:SLEg8TqYulVKKfIGHldVp2K2aYz2DKSVBq4g/H5bR7Q=
 github.com/sohaha/zlsgo v1.7.22 h1:xJC0oXpUdHDHaoWhsujdsoIRHFOcxafY77ccXkjWtUQ=
