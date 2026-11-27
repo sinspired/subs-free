@@ -289,12 +289,12 @@ jobs:
             goos: windows
 
           # ── macOS Intel（.app.tar.gz）──
-          - os: macos-15-intel
+          - os: macos-26-intel
             arch: amd64
             goos: darwin
 
           # ── macOS Apple Silicon（.app.tar.gz）──
-          - os: macos-15
+          - os: macos-26
             arch: arm64
             goos: darwin
 
